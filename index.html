@@ -2,11 +2,24 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>梅雨季 · Plum Rain Season</title>
+
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#FDFAF6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="梅雨季">
+<meta name="mobile-web-app-capable" content="yes">
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.5/mqtt.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
-*,*::before,*::after{box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
   --plum:#6B4E5E;--plum-deep:#463039;--rose:#D9A7A7;
   --gold:#C4A265;--gold-soft:rgba(196,162,101,.28);
@@ -17,12 +30,18 @@
   --glass-blur:20px;
   --bg-tint:rgba(253,250,246,0.10);
   --bg-url:none;
+  --app-max:480px;
 }
-html,body{margin:0;padding:0;min-height:100%}
+html,body{margin:0;padding:0;height:100%}
 body{
   font-family:"Cormorant Garamond","Songti SC","STSong","Noto Serif SC",Georgia,serif;
-  color:var(--ink);background:#FDFAF6;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+  color:var(--ink);background:#FDFAF6;-webkit-font-smoothing:antialiased;
+  overflow:hidden;
 }
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,textarea{font-family:inherit}
+.hidden{display:none!important}
+
 .bg-wall{
   position:fixed;inset:0;z-index:-3;pointer-events:none;
   background-color:#FDFAF6;
@@ -33,407 +52,688 @@ body{
     radial-gradient(circle at 30% 55%, rgba(217,180,200,.22), transparent 45%),
     radial-gradient(circle at 50% 108%, rgba(196,162,101,.28), transparent 55%),
     linear-gradient(180deg,#FDFAF6 0%,#F8F1EC 55%,#F5EDE9 100%);
-  background-size:cover, auto, auto, auto, auto, cover;
+  background-size:cover,auto,auto,auto,auto,cover;
   background-position:center;
   background-repeat:no-repeat;
 }
-.bg-tint{
-  position:fixed;inset:0;z-index:-2;pointer-events:none;
-  background-color:var(--bg-tint,rgba(253,250,246,0.10));
+.bg-tint{position:fixed;inset:0;z-index:-2;pointer-events:none;background-color:var(--bg-tint)}
+#rain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1}
+
+.app{
+  position:relative;width:100%;max-width:var(--app-max);height:100vh;
+  margin:0 auto;display:flex;flex-direction:column;
+  background:var(--glass-bg);
+  backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
+  border-left:1px solid var(--gold-soft);
+  border-right:1px solid var(--gold-soft);
+  overflow:hidden;
 }
-#rain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+@media(max-width:480px){.app{max-width:100%;border-left:0;border-right:0}}
 
 .topbar{
-  position:sticky;top:0;z-index:60;
-  display:flex;align-items:center;justify-content:space-between;gap:20px;
-  padding:16px 40px;
-  background:var(--glass-bg,rgba(255,255,255,0.55));
-  backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
-  -webkit-backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px 12px;
   border-bottom:1px solid var(--gold-soft);
-  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 6px 24px rgba(107,78,94,.05);
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(1.2);
+  -webkit-backdrop-filter:blur(20px) saturate(1.2);
+  position:relative;z-index:10;
 }
-.brand{display:flex;align-items:baseline;gap:14px}
-.brand h1{margin:0;font-size:25px;font-weight:600;letter-spacing:.32em;color:var(--plum-deep);text-shadow:0 1px 0 rgba(255,255,255,.6)}
-.brand .en{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);opacity:.9}
-.brand .mark{color:var(--gold);font-size:15px;transform:translateY(-2px)}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.sync-badge{
-  display:flex;align-items:center;gap:7px;cursor:pointer;
-  font-size:11px;letter-spacing:.16em;color:var(--ink-soft);
-  padding:5px 12px;border-radius:999px;
-  border:1px solid var(--gold-soft);background:rgba(255,255,255,.45);
-  transition:.25s;user-select:none;
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-}
-.sync-badge:hover{background:#fff;border-color:var(--gold)}
-.sync-badge .dot{
-  width:6px;height:6px;border-radius:50%;background:#A8C4A0;
-  box-shadow:0 0 6px rgba(168,196,160,.9);transition:.3s;
-}
-.sync-badge.local .dot{background:#D9B87E;box-shadow:0 0 6px rgba(217,184,126,.9)}
-.sync-badge.syncing .dot{background:#C9A275;animation:pulse 1s infinite}
-.sync-badge.error .dot{background:#D98888;box-shadow:0 0 6px rgba(217,136,136,.9)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-
-.layout{
-  flex:1;display:grid;grid-template-columns:326px minmax(0,1fr);gap:26px;
-  width:100%;max-width:1320px;margin:0 auto;padding:28px 40px 90px;
-}
-.sidebar{display:flex;flex-direction:column;gap:18px}
-.main{min-width:0;display:flex;flex-direction:column;gap:20px}
-
-.card{
-  position:relative;
-  background:var(--glass-bg,rgba(255,255,255,0.55));
-  backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
-  -webkit-backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
-  border:1px solid var(--gold-soft);border-radius:var(--radius);
-  box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
-}
-.card.corner::before,.card.corner::after{
-  content:'';position:absolute;width:15px;height:15px;pointer-events:none;
-  border:1px solid rgba(196,162,101,.5);
-}
-.card.corner::before{top:7px;left:7px;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
-.card.corner::after{bottom:7px;right:7px;border-left:0;border-top:0;border-radius:0 0 8px 0}
-
-.person{display:flex;align-items:center;gap:14px;padding:18px 18px 18px 20px;transition:.28s cubic-bezier(.2,.8,.3,1)}
-.person:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(107,78,94,.13), inset 0 1px 0 rgba(255,255,255,.7)}
-.avatar{
-  position:relative;flex:0 0 auto;width:58px;height:58px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;color:#fff;overflow:hidden;
-  border:1px solid rgba(255,255,255,.9);
-  box-shadow:0 0 0 1px var(--gold-soft), 0 6px 16px rgba(107,78,94,.14);
-}
-.avatar.A{background:linear-gradient(145deg,#E5B9BC,#C79BAE)}
-.avatar.B{background:linear-gradient(145deg,#B9C7DE,#98A8C6)}
-.avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.person-body{min-width:0;flex:1}
-.person-top{display:flex;align-items:center;gap:8px}
-.person-top h3{margin:0;font-size:17px;font-weight:600;letter-spacing:.08em;color:var(--plum-deep)}
-.role{font-size:10px;letter-spacing:.14em;padding:2px 7px;border-radius:20px;color:var(--gold);border:1px solid var(--gold-soft);background:rgba(255,255,255,.5)}
-.status{margin:6px 0 0;font-size:13.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand .mark{color:var(--gold);font-size:14px}
+.brand h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.28em;color:var(--plum-deep)}
+.brand .en{font-size:9px;letter-spacing:.3em;color:var(--gold);opacity:.85}
+.topbar-actions{display:flex;align-items:center;gap:8px}
 .icon-btn{
-  flex:0 0 auto;width:30px;height:30px;border-radius:50%;
+  width:34px;height:34px;border-radius:50%;
   border:1px solid var(--gold-soft);background:rgba(255,255,255,.5);
-  color:var(--gold);cursor:pointer;font-size:13px;line-height:1;
-  transition:.2s;display:flex;align-items:center;justify-content:center;
+  color:var(--gold);font-size:15px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;transition:.2s;
 }
 .icon-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
-
-.quote-card{padding:18px 22px;font-size:13px;line-height:2;letter-spacing:.14em;color:var(--ink-soft);font-style:italic;text-align:center}
-.quote-card .sep{display:block;color:var(--gold);font-size:10px;margin:8px 0 4px;letter-spacing:.5em}
-
-.tabs{
-  display:flex;gap:6px;padding:6px;
-  background:var(--glass-bg,rgba(255,255,255,0.55));
-  backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
-  -webkit-backdrop-filter:blur(var(--glass-blur,20px)) saturate(1.2);
-  border:1px solid var(--gold-soft);border-radius:999px;
-  box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
-  align-self:flex-start;
+.icon-btn .badge{
+  position:absolute;top:-3px;right:-3px;
+  min-width:16px;height:16px;padding:0 4px;
+  background:#D98888;color:#fff;font-size:10px;line-height:16px;
+  border-radius:8px;text-align:center;font-family:system-ui,sans-serif;
+  font-weight:600;display:none;
 }
-.tab{
-  border:0;background:transparent;cursor:pointer;font-family:inherit;
-  font-size:14.5px;letter-spacing:.2em;color:var(--ink-soft);
-  padding:10px 26px;border-radius:999px;transition:.28s cubic-bezier(.2,.8,.3,1);
+.icon-btn.has-badge .badge{display:block}
+.sync-dot{
+  position:absolute;bottom:-1px;right:-1px;
+  width:9px;height:9px;border-radius:50%;
+  background:#D9B87E;border:1.5px solid #fff;
 }
-.tab:hover{color:var(--plum)}
-.tab.active{color:#fff;background:linear-gradient(140deg,#C9A275,#B98CA0);box-shadow:0 6px 18px rgba(185,140,160,.35), inset 0 1px 0 rgba(255,255,255,.4)}
+.sync-dot.online{background:#A8C4A0}
+.sync-dot.syncing{background:#C9A275;animation:pulse 1s infinite}
+.sync-dot.error{background:#D98888}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-.composer{display:flex;gap:14px;padding:18px 20px}
+.content{
+  flex:1 1 auto;overflow-y:auto;overflow-x:hidden;
+  padding:16px 16px 20px;
+  scrollbar-width:thin;scrollbar-color:rgba(196,162,101,.3) transparent;
+  -webkit-overflow-scrolling:touch;
+}
+.content::-webkit-scrollbar{width:6px}
+.content::-webkit-scrollbar-thumb{background:rgba(196,162,101,.28);border-radius:10px}
+.page{display:none}
+.page.active{display:block;animation:pageIn .3s ease}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.bottom-nav{
+  flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(1.2);
+  -webkit-backdrop-filter:blur(20px) saturate(1.2);
+  border-top:1px solid var(--gold-soft);
+  box-shadow:0 -4px 18px rgba(107,78,94,.06);
+  position:relative;z-index:10;
+}
+.nav-btn{
+  padding:6px 0;border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--ink-soft);transition:.22s;
+  font-size:10px;letter-spacing:.12em;
+}
+.nav-btn .ico{font-size:20px;line-height:1}
+.nav-btn.active{
+  color:var(--plum);font-weight:600;
+  background:linear-gradient(140deg,rgba(201,162,117,.18),rgba(185,140,160,.18));
+}
+.nav-btn.active .ico{transform:scale(1.1)}
+
+.card{
+  background:rgba(255,255,255,.65);
+  backdrop-filter:blur(14px) saturate(1.15);
+  -webkit-backdrop-filter:blur(14px) saturate(1.15);
+  border:1px solid var(--gold-soft);border-radius:var(--radius);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7);
+  position:relative;
+}
+.card.corner::before,.card.corner::after{
+  content:'';position:absolute;width:12px;height:12px;pointer-events:none;
+  border:1px solid rgba(196,162,101,.5);
+}
+.card.corner::before{top:6px;left:6px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
+.card.corner::after{bottom:6px;right:6px;border-left:0;border-top:0;border-radius:0 0 6px 0}
+
+.mjy-bubble{
+  position:relative;display:inline-block;
+  max-width:100%;padding:10px 16px;border-radius:18px;
+  background:rgba(255,255,255,.85);
+  font-size:14.5px;line-height:1.85;letter-spacing:.02em;
+  color:var(--ink);word-break:break-word;white-space:pre-wrap;
+}
+.mjy-bubble.mine{background:linear-gradient(140deg,rgba(217,167,167,.28),rgba(201,162,117,.22));color:var(--plum-deep)}
+.mjy-bubble.theirs{background:rgba(168,184,208,.22);color:var(--ink)}
+.mjy-avatar{
+  width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;color:#fff;overflow:hidden;
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 1px var(--gold-soft),0 4px 10px rgba(107,78,94,.12);
+}
+.mjy-avatar.A{background:linear-gradient(145deg,#E5B9BC,#C79BAE)}
+.mjy-avatar.B{background:linear-gradient(145deg,#B9C7DE,#98A8C6)}
+.mjy-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+
+.field{margin-bottom:14px}
+.field label{
+  display:block;font-size:11px;letter-spacing:.2em;color:var(--gold);
+  margin-bottom:6px;font-weight:500;
+}
+.field label .val{float:right;color:var(--plum);letter-spacing:.04em;font-weight:600}
+.field input[type=text],.field textarea{
+  width:100%;border:1px solid var(--gold-soft);border-radius:12px;
+  background:rgba(255,255,255,.7);outline:none;
+  font-size:14px;color:var(--ink);padding:10px 13px;transition:.2s;
+}
+.field textarea{resize:vertical;min-height:70px;line-height:1.7;font-size:13px}
+.field input[type=text]:focus,.field textarea:focus{
+  border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,162,101,.12);
+}
+.field input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;
+  background:rgba(196,162,101,.22);border-radius:2px;outline:none;margin:8px 0 4px;
+}
+.field input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:linear-gradient(140deg,#C9A275,#B98CA0);
+  cursor:pointer;box-shadow:0 3px 8px rgba(185,140,160,.5);
+}
+.field input[type=range]::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;border:0;
+  background:linear-gradient(140deg,#C9A275,#B98CA0);cursor:pointer;
+}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 18px;border-radius:999px;font-size:12.5px;
+  letter-spacing:.12em;transition:.2s;border:1px solid transparent;
+  white-space:nowrap;
+}
+.btn-ghost{background:rgba(255,255,255,.6);border-color:var(--gold-soft);color:var(--gold)}
+.btn-ghost:hover{background:#fff;border-color:var(--gold)}
+.btn-primary{
+  background:linear-gradient(140deg,#C9A275,#B98CA0);color:#fff;
+  box-shadow:0 5px 14px rgba(185,140,160,.32);
+}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:disabled{opacity:.5;cursor:wait}
+.btn-block{width:100%}
+.btn-sm{padding:6px 12px;font-size:11.5px}
+
+.composer{padding:14px 16px;margin-bottom:14px}
 .composer textarea{
-  flex:1;min-height:74px;resize:vertical;border:0;background:transparent;outline:none;
-  font-family:inherit;font-size:15px;line-height:1.85;color:var(--ink);padding:6px 2px;
+  width:100%;min-height:60px;border:0;background:transparent;outline:none;
+  font-size:14.5px;line-height:1.85;color:var(--ink);padding:4px 0;
+  resize:vertical;
 }
 .composer textarea::placeholder{color:#B9AAB0;font-style:italic}
-.composer-side{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;gap:10px}
-.btn{
-  font-family:inherit;cursor:pointer;border-radius:999px;
-  font-size:13px;letter-spacing:.14em;transition:.22s;border:1px solid transparent;padding:8px 18px;
+.composer-actions{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:8px;padding-top:10px;border-top:1px dashed var(--gold-soft);
 }
-.btn-ghost{background:rgba(255,255,255,.5);border-color:var(--gold-soft);color:var(--gold)}
-.btn-ghost:hover{background:#fff;border-color:var(--gold)}
-.btn-primary{background:linear-gradient(140deg,#C9A275,#B98CA0);color:#fff;box-shadow:0 6px 16px rgba(185,140,160,.32)}
-.btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
-.btn-primary:disabled{opacity:.6;cursor:wait;transform:none}
-.preview-strip{margin:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap}
-.preview-strip img{width:74px;height:74px;object-fit:cover;border-radius:12px;border:1px solid var(--gold-soft)}
+.composer-actions .left{display:flex;gap:8px}
+.preview-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.preview-strip img{width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--gold-soft)}
 
-.entry{padding:22px 24px 18px;margin-bottom:16px}
-.entry-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.entry-head .avatar{width:42px;height:42px;font-size:16px}
+.entry{padding:14px 16px;margin-bottom:12px}
+.entry-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.entry-head .mjy-avatar{width:34px;height:34px;font-size:13px}
 .entry-meta{flex:1;min-width:0}
-.entry-meta h4{margin:0;font-size:15px;font-weight:600;letter-spacing:.1em;color:var(--plum-deep)}
-.entry-meta span{font-size:11.5px;color:#AC9CA4;letter-spacing:.12em}
-.entry-text{font-size:15.5px;line-height:2.05;letter-spacing:.04em;white-space:pre-wrap;word-break:break-word}
-.entry-img{margin-top:14px;border-radius:16px;overflow:hidden;border:1px solid var(--gold-soft)}
+.entry-meta h4{margin:0;font-size:13.5px;font-weight:600;color:var(--plum-deep);letter-spacing:.06em}
+.entry-meta span{font-size:10.5px;color:#AC9CA4;letter-spacing:.1em}
+.entry-text{margin-top:2px}
+.entry-img{margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--gold-soft)}
 .entry-img img{width:100%;display:block}
-
+.comments{margin-top:10px;padding-top:8px;border-top:1px dashed var(--gold-soft);display:flex;flex-direction:column;gap:6px}
+.comment{display:flex;gap:6px;font-size:12.5px;line-height:1.75;color:var(--ink-soft)}
+.comment b{color:var(--plum);font-weight:600;flex:0 0 auto}
+.comment .ct{font-size:10px;color:#BBAFB5;margin-left:auto;flex:0 0 auto}
+.comment-box{display:flex;gap:6px;margin-top:8px;align-items:center}
+.comment-box input{
+  flex:1;border:0;border-bottom:1px solid var(--gold-soft);background:transparent;
+  outline:none;font-size:12.5px;color:var(--ink);padding:5px 2px;
+}
+.comment-box input:focus{border-color:var(--gold)}
+.comment-box .send{
+  width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--gold-soft);background:rgba(255,255,255,.6);
+  color:var(--gold);font-size:13px;
+}
 .del-btn{
-  position:absolute;top:10px;right:10px;z-index:5;
-  width:26px;height:26px;border-radius:50%;cursor:pointer;
+  position:absolute;top:8px;right:8px;
+  width:24px;height:24px;border-radius:50%;
   border:1px solid var(--gold-soft);background:rgba(255,255,255,.7);
-  color:#B08A8A;font-size:14px;line-height:1;
+  color:#B08A8A;font-size:13px;line-height:1;
   display:flex;align-items:center;justify-content:center;
-  opacity:.25;transition:.22s;
+  opacity:.3;transition:.2s;
 }
 .card:hover .del-btn{opacity:1}
 .del-btn:hover{background:#D98888;color:#fff;border-color:#D98888}
-@media (hover:none){.del-btn{opacity:.65}}
 
-.divider{display:flex;align-items:center;gap:12px;margin:18px 0 10px;color:var(--gold);font-size:10px;letter-spacing:.6em}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold-soft),transparent)}
+.album-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.photo{overflow:hidden;padding:0}
+.photo-img{width:100%;aspect-ratio:1/1;overflow:hidden;background:#EFE6E2;position:relative}
+.photo-img img{width:100%;height:100%;object-fit:cover;display:block;transition:.5s}
+.photo:hover .photo-img img{transform:scale(1.05)}
+.photo-body{padding:8px 10px 10px}
+.photo-meta{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:11px;color:var(--ink-soft)}
+.photo-meta .mjy-avatar{width:20px;height:20px;font-size:10px}
+.photo-meta .time{margin-left:auto;font-size:10px;color:#BBAFB5}
+.caption{font-size:12px;line-height:1.7;color:var(--ink);margin:0}
 
-.comments{display:flex;flex-direction:column;gap:2px}
-.comment{display:flex;gap:8px;font-size:13.5px;line-height:1.9;color:var(--ink-soft);padding:3px 0}
-.comment b{color:var(--plum);font-weight:600;flex:0 0 auto}
-.comment .ct{font-size:11px;color:#BBAFB5;flex:0 0 auto;margin-left:auto}
-.comment-box{display:flex;gap:10px;margin-top:10px;align-items:center}
-.comment-box input{
-  flex:1;border:0;border-bottom:1px solid var(--gold-soft);background:transparent;
-  outline:none;font-family:inherit;font-size:14px;color:var(--ink);padding:7px 2px;transition:.25s;
+.empty{
+  text-align:center;color:#BBAFB5;font-style:italic;font-size:13px;
+  padding:34px 0;letter-spacing:.12em;
 }
-.comment-box input:focus{border-color:var(--gold)}
-.comment-box input::placeholder{color:#C3B6BC;font-style:italic}
-.send{
+
+.survey-actions{padding:14px 16px;margin-bottom:12px;text-align:center}
+.survey-actions .desc{font-size:12.5px;color:var(--ink-soft);line-height:1.85;margin:0 0 10px}
+.survey-actions .btn-group{display:flex;gap:8px}
+.survey-actions .btn-group .btn{flex:1}
+
+.survey-item{padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.survey-item .s-ico{
+  width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+  background:linear-gradient(140deg,rgba(201,162,117,.3),rgba(185,140,160,.3));
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.survey-item .s-body{flex:1;min-width:0}
+.survey-item .s-body h4{margin:0 0 3px;font-size:14px;color:var(--plum-deep);letter-spacing:.05em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.survey-item .s-body p{margin:0;font-size:11.5px;color:var(--ink-soft)}
+.survey-item .s-status{font-size:10px;letter-spacing:.1em;padding:3px 8px;border-radius:20px}
+.survey-item .s-status.todo{background:rgba(217,136,136,.2);color:#B07070}
+.survey-item .s-status.done{background:rgba(168,196,160,.28);color:#5F8A5F}
+
+.quiz-overlay{
+  position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+  background:rgba(70,48,57,.4);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  padding:16px;
+}
+.quiz-box{
+  width:100%;max-width:420px;max-height:calc(100vh - 40px);
+  background:rgba(255,255,255,.96);border-radius:22px;
+  border:1px solid var(--gold-soft);padding:22px 20px;
+  display:flex;flex-direction:column;
+  box-shadow:0 20px 50px rgba(70,48,57,.25);
+}
+.quiz-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.quiz-head h3{margin:0;font-size:15px;color:var(--plum-deep);letter-spacing:.1em;flex:1;min-width:0}
+.quiz-close{font-size:20px;color:var(--ink-soft);width:28px;height:28px;border-radius:50%}
+.quiz-close:hover{background:rgba(196,162,101,.15);color:var(--plum)}
+.quiz-progress{font-size:11px;color:var(--gold);letter-spacing:.2em;text-align:center;margin-bottom:14px}
+.quiz-progress-bar{height:3px;background:rgba(196,162,101,.15);border-radius:2px;margin-bottom:16px;overflow:hidden}
+.quiz-progress-bar i{display:block;height:100%;background:linear-gradient(90deg,#C9A275,#B98CA0);transition:.3s}
+.quiz-question{font-size:15px;line-height:1.9;color:var(--ink);margin-bottom:14px;letter-spacing:.02em;min-height:40px}
+.quiz-answer{
+  width:100%;min-height:44px;max-height:200px;resize:none;
+  border:1px solid var(--gold-soft);border-radius:14px;
+  background:rgba(255,255,255,.7);outline:none;
+  font-size:14px;line-height:1.7;color:var(--ink);
+  padding:10px 14px;transition:.2s;font-family:inherit;
+}
+.quiz-answer:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,162,101,.12)}
+.quiz-actions{display:flex;gap:8px;margin-top:14px}
+.quiz-actions .btn{flex:1}
+
+/* ===== 神秘学 ===== */
+.mystic-tabs{
+  display:flex;gap:4px;padding:4px;margin-bottom:16px;
+  background:rgba(255,255,255,.5);border-radius:999px;
+  border:1px solid var(--gold-soft);
+}
+.mystic-tabs .mt-btn{
+  flex:1;padding:9px 0;border-radius:999px;
+  font-size:13px;letter-spacing:.18em;color:var(--ink-soft);transition:.25s;
+}
+.mystic-tabs .mt-btn.active{
+  color:#fff;background:linear-gradient(140deg,#C9A275,#B98CA0);
+  box-shadow:0 4px 12px rgba(185,140,160,.3);
+}
+.mystic-panel{display:none}
+.mystic-panel.active{display:block}
+
+/* 塔罗 */
+.tarot-setup{padding:16px;text-align:center;margin-bottom:14px}
+.tarot-setup .desc{font-size:12.5px;color:var(--ink-soft);line-height:1.85;margin:0 0 12px}
+.tarot-counts{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+.tarot-counts button{
+  padding:8px 18px;border-radius:999px;font-size:13px;
   border:1px solid var(--gold-soft);background:rgba(255,255,255,.5);
-  color:var(--gold);width:32px;height:32px;border-radius:50%;cursor:pointer;
-  transition:.22s;font-size:14px;line-height:1;
+  color:var(--ink-soft);transition:.2s;letter-spacing:.1em;
 }
-.send:hover{background:var(--gold);color:#fff}
+.tarot-counts button.active{
+  background:linear-gradient(140deg,#C9A275,#B98CA0);color:#fff;border-color:transparent;
+}
+.tarot-hint{
+  text-align:center;font-size:11.5px;color:var(--ink-soft);
+  letter-spacing:.15em;margin-bottom:10px;font-style:italic;
+}
 
-.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;align-items:start}
-.photo{overflow:hidden;padding:0;transition:.3s cubic-bezier(.2,.8,.3,1)}
-.photo:hover{transform:translateY(-3px);box-shadow:0 18px 44px rgba(107,78,94,.15), inset 0 1px 0 rgba(255,255,255,.7)}
-.photo-img{width:100%;aspect-ratio:4/3;overflow:hidden;background:#EFE6E2;position:relative}
-.photo-img img{width:100%;height:100%;object-fit:cover;display:block;transition:.6s}
-.photo:hover .photo-img img{transform:scale(1.045)}
-.photo-body{padding:16px 18px 18px}
-.photo-meta{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-.photo-meta .avatar{width:30px;height:30px;font-size:13px}
-.photo-meta .name{font-size:13px;color:var(--plum);letter-spacing:.08em}
-.photo-meta .time{margin-left:auto;font-size:11px;color:#BBAFB5}
-.caption{font-size:14px;line-height:1.95;color:var(--ink);margin:0}
+/* 两行横向滚动 */
+.tarot-deck{
+  position:relative;border-radius:16px;padding:8px 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,.7) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(245,235,240,.55) 0%, transparent 40%),
+    rgba(248,250,248,.5);
+  border:1px solid rgba(255,255,255,.5);
+  box-shadow:inset 0 0 30px rgba(255,255,255,.5);
+}
+.tarot-row{
+  display:flex;gap:8px;padding:6px 8px;
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:thin;scrollbar-color:rgba(196,162,101,.4) transparent;
+  -webkit-overflow-scrolling:touch;
+}
+.tarot-row::-webkit-scrollbar{height:5px}
+.tarot-row::-webkit-scrollbar-thumb{background:rgba(196,162,101,.35);border-radius:10px}
+.tarot-row::-webkit-scrollbar-track{background:transparent}
 
-.calendar{padding:24px 26px 26px}
-.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.cal-title{display:flex;flex-direction:column;gap:2px}
-.cal-title h2{margin:0;font-size:21px;font-weight:600;letter-spacing:.16em;color:var(--plum-deep)}
-.cal-title span{font-size:11px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase}
-.cal-nav{display:flex;gap:8px}
-.cal-nav button{
-  width:36px;height:36px;border-radius:50%;cursor:pointer;
-  border:1px solid var(--gold-soft);background:rgba(255,255,255,.5);
-  color:var(--gold);font-size:16px;line-height:1;transition:.22s;
+.tarot-card{
+  flex:0 0 62px;
+  width:62px;height:100px;
+  border-radius:10px;cursor:pointer;
+  background:linear-gradient(160deg,#4A3B52 0%,#2D2338 50%,#4A3B52 100%);
+  border:1px solid rgba(196,162,101,.45);
   display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  transition:.3s cubic-bezier(.2,.8,.3,1);
+  box-shadow:0 3px 10px rgba(70,48,57,.2);
+  user-select:none;
 }
-.cal-nav button:hover{background:#fff;transform:scale(1.06)}
-.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px}
-.cal-week span{text-align:center;font-size:11.5px;letter-spacing:.2em;color:#B3A5AB;padding:6px 0}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-.cal-day{
-  position:relative;aspect-ratio:1/1;border-radius:15px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  font-size:15px;color:var(--ink);
-  background:rgba(255,255,255,.35);
-  border:1px solid rgba(196,162,101,.13);
-  transition:.24s cubic-bezier(.2,.8,.3,1);
+.tarot-card::before{
+  content:'✦';font-size:16px;color:rgba(196,162,101,.55);
+  position:absolute;
 }
-.cal-day:hover{background:rgba(255,255,255,.85);transform:translateY(-2px);box-shadow:0 8px 20px rgba(107,78,94,.1)}
-.cal-day.empty{background:none;border:0;cursor:default;pointer-events:none}
-.cal-day.today{border-color:var(--gold);color:var(--plum-deep);font-weight:600}
-.cal-day.today::after{content:'今';position:absolute;bottom:4px;font-size:8px;letter-spacing:.1em;color:var(--gold)}
-.cal-day.selected{background:linear-gradient(150deg,#CDA77A,#B98CA0);color:#fff;border-color:transparent;box-shadow:0 8px 22px rgba(185,140,160,.4), inset 0 1px 0 rgba(255,255,255,.45)}
-.cal-day.selected::after{color:rgba(255,255,255,.85)}
-.cal-day .dot{position:absolute;bottom:7px;width:4px;height:4px;border-radius:50%;background:var(--rose)}
-.cal-day.selected .dot{background:#fff}
+.tarot-card::after{
+  content:'';position:absolute;inset:4px;
+  border:1px solid rgba(196,162,101,.3);border-radius:6px;
+}
+.tarot-card:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 6px 16px rgba(70,48,57,.3)}
+.tarot-card.picked{opacity:0;pointer-events:none;transform:scale(.5) rotate(15deg)}
 
-.day-panel{margin-top:22px;padding-top:18px;border-top:1px solid var(--gold-soft)}
-.day-panel h4{margin:0 0 14px;font-size:13px;letter-spacing:.24em;color:var(--gold);font-weight:500}
-.day-item{display:flex;gap:10px;padding:10px 0;font-size:14px;line-height:1.85;color:var(--ink);border-bottom:1px dashed rgba(196,162,101,.2)}
-.day-item:last-child{border-bottom:0}
-.day-item .tag{flex:0 0 auto;font-size:10px;letter-spacing:.14em;color:var(--gold);border:1px solid var(--gold-soft);border-radius:20px;padding:2px 9px;height:fit-content;background:rgba(255,255,255,.5);margin-top:3px}
-.empty{text-align:center;color:#BBAFB5;font-style:italic;font-size:14px;padding:40px 0;letter-spacing:.14em}
+.tarot-result{margin-top:14px}
+.tarot-result .tr-item{
+  padding:12px 14px;margin-bottom:8px;border-radius:14px;
+  background:rgba(255,255,255,.65);border:1px solid var(--gold-soft);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.tarot-result .tr-item h5{margin:0 0 4px;font-size:13px;color:var(--plum-deep);letter-spacing:.06em}
+.tarot-result .tr-item .pos-tag{
+  display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;
+  background:rgba(196,162,101,.18);color:var(--plum);margin-left:6px;letter-spacing:.1em;
+}
+.tarot-result .tr-item p{margin:6px 0 0;font-size:12.5px;line-height:1.85;color:var(--ink-soft)}
+
+/* 花瓣 */
+.petal{
+  position:absolute;width:14px;height:14px;
+  background:radial-gradient(ellipse at 30% 30%, #FFFFFF 0%, #F8E8EC 50%, #E8D0D6 100%);
+  border-radius:50% 0 50% 50%;
+  transform-origin:center;pointer-events:none;z-index:10;opacity:0;
+  filter:drop-shadow(0 1px 2px rgba(180,160,170,.15));
+  animation:petalFall var(--dur,3s) cubic-bezier(.4,.1,.6,.9) forwards;
+}
+@keyframes petalFall{
+  0%{top:-20px;opacity:0;transform:translateX(0) rotate(0deg)}
+  10%{opacity:.95}
+  50%{transform:translateX(var(--drift,20px)) rotate(180deg)}
+  90%{opacity:.8}
+  100%{top:var(--ey,400px);opacity:0;transform:translateX(var(--drift2,-10px)) rotate(540deg)}
+}
+
+/* 抽签 */
+.sign-bg{
+  position:relative;width:100%;height:340px;border-radius:22px;
+  overflow:hidden;margin-bottom:14px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,.95) 0%, transparent 30%),
+    radial-gradient(circle at 75% 55%, rgba(240,248,244,.9) 0%, transparent 35%),
+    radial-gradient(circle at 40% 85%, rgba(255,255,255,.8) 0%, transparent 25%),
+    radial-gradient(circle at 85% 20%, rgba(230,240,235,.85) 0%, transparent 30%),
+    linear-gradient(160deg, #E8EFEB 0%, #DDE9E3 50%, #D6E2DC 100%);
+  box-shadow:inset 0 0 60px rgba(255,255,255,.4);
+}
+.sign-bg-drops{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,.9) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255,255,255,.75) 1.5px, transparent 2px),
+    radial-gradient(circle, rgba(255,255,255,.85) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255,255,255,.6) 2px, transparent 2.5px);
+  background-size:60px 90px, 90px 120px, 50px 100px, 130px 150px;
+  background-position:0 0, 30px 20px, 15px 40px, 60px 10px;
+  animation:dropFade 1s ease-in-out;
+}
+@keyframes dropFade{from{opacity:0}to{opacity:1}}
+
+.glass-btn{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:130px;height:130px;border-radius:50%;
+  background:rgba(255,255,255,.28);
+  backdrop-filter:blur(14px) saturate(1.6);
+  -webkit-backdrop-filter:blur(14px) saturate(1.6);
+  border:1.5px solid rgba(255,255,255,.65);
+  box-shadow:
+    0 10px 40px rgba(120,145,135,.18),
+    inset 0 1px 3px rgba(255,255,255,.95),
+    inset 0 -2px 6px rgba(255,255,255,.35),
+    0 0 0 6px rgba(255,255,255,.08);
+  color:#4A5A52;font-size:17px;letter-spacing:.5em;text-indent:.5em;
+  font-weight:500;cursor:pointer;
+  transition:all .35s cubic-bezier(.2,.9,.3,1);
+  font-family:inherit;z-index:5;
+}
+.glass-btn:hover{
+  background:rgba(255,255,255,.45);
+  transform:translate(-50%,-50%) scale(1.06);
+}
+.glass-btn:active{transform:translate(-50%,-50%) scale(.97)}
+
+.rain-drop-anim{
+  position:absolute;width:6px;height:10px;
+  background:radial-gradient(ellipse at 40% 30%, #fff 0%, rgba(220,235,228,.8) 60%, rgba(200,220,210,.5) 100%);
+  border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+  pointer-events:none;z-index:3;
+  box-shadow:inset -1px -1px 2px rgba(255,255,255,.8), 0 2px 4px rgba(120,140,130,.15);
+  animation:dropSlide linear forwards;
+}
+@keyframes dropSlide{
+  0%{top:var(--sy,0);opacity:0;transform:scale(.6)}
+  20%{opacity:1;transform:scale(1)}
+  80%{opacity:1}
+  100%{top:var(--ey,300px);opacity:0;transform:scale(.5)}
+}
+
+.sign-result{
+  opacity:0;transform:translateY(30px) scale(.94);
+  transition:.8s cubic-bezier(.2,.9,.3,1);
+  padding:24px 22px;text-align:center;
+  background:linear-gradient(160deg,#FFFBF2 0%,#FFF2E0 100%);
+  border-radius:18px;border:1px solid rgba(196,162,101,.5);
+  box-shadow:0 10px 30px rgba(196,162,101,.25);
+  position:relative;overflow:hidden;
+}
+.sign-result::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:6px;
+  background:linear-gradient(90deg,#C9A275,#B98CA0,#C9A275);
+}
+.sign-result::after{
+  content:'✦';position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  font-size:14px;color:var(--gold);
+}
+.sign-result.show{opacity:1;transform:translateY(0) scale(1)}
+.sign-result .sr-num{font-size:13px;letter-spacing:.3em;color:var(--gold);margin-bottom:6px}
+.sign-result .sr-level{
+  display:inline-block;padding:3px 14px;border-radius:20px;
+  background:linear-gradient(140deg,rgba(201,162,117,.25),rgba(185,140,160,.25));
+  font-size:12px;letter-spacing:.2em;color:var(--plum-deep);
+  margin-bottom:14px;font-weight:600;
+}
+.sign-result .sr-text{
+  font-size:15px;line-height:2;color:var(--ink);letter-spacing:.04em;
+  margin:14px 0 6px;font-style:italic;
+}
+
+/* ===== 设置 ===== */
+.section-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;letter-spacing:.24em;color:var(--plum);
+  margin:18px 0 10px;padding-top:14px;
+  border-top:1px solid var(--gold-soft);
+}
+.section-title:first-child{margin-top:0;padding-top:0;border-top:0}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--gold-soft),transparent)}
+
+.people-row{display:flex;gap:10px;margin-bottom:12px}
+.person-mini{
+  flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:rgba(255,255,255,.55);border:1px solid var(--gold-soft);
+  border-radius:14px;cursor:pointer;transition:.2s;
+}
+.person-mini:hover{background:rgba(255,255,255,.85)}
+.person-mini .mjy-avatar{width:36px;height:36px;font-size:14px}
+.person-mini .info{flex:1;min-width:0}
+.person-mini .info h5{margin:0;font-size:12.5px;color:var(--plum-deep);letter-spacing:.06em}
+.person-mini .info p{margin:2px 0 0;font-size:10.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.bg-preview{
+  width:100%;aspect-ratio:16/10;border-radius:12px;overflow:hidden;
+  border:1px solid var(--gold-soft);margin-bottom:8px;
+  background:repeating-conic-gradient(rgba(196,162,101,.08) 0 25%,transparent 0 50%) 50%/14px 14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:#BBAFB5;letter-spacing:.2em;font-style:italic;
+}
+.bg-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.bg-actions{display:flex;gap:6px}
+.bg-actions .btn{flex:1}
+
+.room-box{
+  font-size:11.5px;line-height:1.9;padding:12px 14px;border-radius:12px;
+  background:rgba(196,162,101,.08);border:1px dashed var(--gold-soft);
+  color:var(--ink-soft);word-break:break-all;margin-bottom:10px;
+}
+.room-box .label{display:block;font-size:10px;letter-spacing:.22em;color:var(--gold);margin-bottom:5px}
+.room-box .code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--plum);user-select:all}
+
+.theme-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;
+  background:rgba(255,255,255,.55);border:1px solid var(--gold-soft);
+  border-radius:12px;
+}
+.theme-item .t-name{flex:1;font-size:12.5px;color:var(--plum-deep);letter-spacing:.05em}
+.theme-item .t-act{font-size:11px;color:var(--gold);padding:4px 10px;border-radius:20px;border:1px solid var(--gold-soft);background:rgba(255,255,255,.5);cursor:pointer;transition:.2s}
+.theme-item .t-act:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
 
 .modal-mask{
   position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
-  background:rgba(70,48,57,.28);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  animation:fadeIn .25s ease;
+  background:rgba(70,48,57,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  padding:16px;animation:fadeIn .2s ease;
 }
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes popIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
 .modal{
-  width:min(460px,calc(100vw - 40px));padding:28px 30px 24px;
-  background:rgba(255,255,255,.95);animation:popIn .3s cubic-bezier(.2,.9,.3,1);
-  max-height:calc(100vh - 60px);overflow-y:auto;
+  width:100%;max-width:400px;max-height:calc(100vh - 40px);overflow-y:auto;
+  padding:22px 20px;background:rgba(255,255,255,.96);
+  border-radius:22px;border:1px solid var(--gold-soft);
+  animation:popIn .3s cubic-bezier(.2,.9,.3,1);
+  box-shadow:0 20px 50px rgba(70,48,57,.25);
 }
-.modal h3{margin:0 0 20px;font-size:16px;font-weight:600;letter-spacing:.24em;color:var(--plum-deep);text-align:center}
-.modal-avatar{display:flex;justify-content:center;margin-bottom:20px}
-.modal-avatar .avatar{width:84px;height:84px;font-size:30px;cursor:pointer}
-.modal-avatar .avatar:hover{filter:brightness(1.06)}
-.field{margin-bottom:16px}
-.field label{display:block;font-size:11px;letter-spacing:.24em;color:var(--gold);margin-bottom:7px}
-.field label .val{float:right;color:var(--plum);letter-spacing:.04em;font-weight:600}
-.field input[type="text"],.field textarea{
-  width:100%;border:1px solid var(--gold-soft);border-radius:12px;
-  background:rgba(255,255,255,.7);outline:none;font-family:inherit;
-  font-size:15px;color:var(--ink);padding:11px 14px;transition:.24s;
-}
-.field textarea{resize:vertical;min-height:80px;font-size:13px;line-height:1.7}
-.field input[type="text"]:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,162,101,.12)}
+.modal h3{margin:0 0 16px;font-size:15px;font-weight:600;letter-spacing:.2em;color:var(--plum-deep);text-align:center}
+.modal-actions{display:flex;gap:8px;margin-top:16px}
+.modal-actions .btn{flex:1}
+.modal-avatar{display:flex;justify-content:center;margin-bottom:16px}
+.modal-avatar .mjy-avatar{width:72px;height:72px;font-size:26px;cursor:pointer}
+.modal-avatar .mjy-avatar:hover{filter:brightness(1.06)}
 
-.field input[type="range"]{
-  -webkit-appearance:none;appearance:none;
-  width:100%;height:4px;margin:10px 0 4px;padding:0;border:0;
-  background:rgba(196,162,101,.22);border-radius:2px;outline:none;
+.theme-editor-modal{max-width:600px!important}
+.theme-editor-modal textarea{
+  width:100%;height:320px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:12px;line-height:1.6;
+  border:1px solid var(--gold-soft);border-radius:12px;
+  background:rgba(255,255,255,.7);color:var(--ink);
+  padding:12px;outline:none;resize:vertical;
 }
-.field input[type="range"]::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;
-  width:22px;height:22px;border-radius:50%;
-  background:linear-gradient(140deg,#C9A275,#B98CA0);
-  cursor:pointer;box-shadow:0 3px 10px rgba(185,140,160,.5), inset 0 1px 0 rgba(255,255,255,.5);
-  transition:.15s;
-}
-.field input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.12)}
-.field input[type="range"]::-moz-range-thumb{
-  width:22px;height:22px;border-radius:50%;border:0;
-  background:linear-gradient(140deg,#C9A275,#B98CA0);
-  cursor:pointer;box-shadow:0 3px 10px rgba(185,140,160,.5);
+.theme-editor-modal textarea:focus{
+  border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,162,101,.12);
 }
 
-.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}
-.slot-btn.active{background:linear-gradient(140deg,#C9A275,#B98CA0);color:#fff;border-color:transparent}
-.hint{font-size:12px;line-height:1.85;color:var(--ink-soft);letter-spacing:.06em;margin:0 0 16px}
-.hint a{color:var(--gold);text-decoration:none;border-bottom:1px dashed var(--gold-soft);cursor:pointer}
-.hint a:hover{color:var(--plum)}
-.hint code{background:rgba(196,162,101,.12);padding:1px 5px;border-radius:5px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--plum)}
-
-.section-title{
-  display:flex;align-items:center;gap:10px;
-  font-size:12px;letter-spacing:.24em;color:var(--plum);
-  margin:22px 0 14px;padding-top:18px;
-  border-top:1px solid var(--gold-soft);
+.msg-panel{
+  position:fixed;top:0;right:0;bottom:0;width:min(360px,90vw);
+  z-index:150;background:rgba(255,255,255,.97);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-left:1px solid var(--gold-soft);
+  transform:translateX(100%);transition:.3s cubic-bezier(.2,.9,.3,1);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:-10px 0 30px rgba(70,48,57,.15);
 }
-.section-title::after{
-  content:'';flex:1;height:1px;
-  background:linear-gradient(90deg,var(--gold-soft),transparent);
+.msg-panel.open{transform:none}
+.msg-head{
+  flex:0 0 auto;padding:18px 20px 14px;
+  border-bottom:1px solid var(--gold-soft);
+  display:flex;align-items:center;justify-content:space-between;
 }
-
-.bg-preview{
-  width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;
-  border:1px solid var(--gold-soft);
-  background:
-    repeating-conic-gradient(rgba(196,162,101,.08) 0 25%, transparent 0 50%) 50% / 16px 16px;
-  display:flex;align-items:center;justify-content:center;
-  margin-bottom:10px;position:relative;
+.msg-head h3{margin:0;font-size:15px;letter-spacing:.24em;color:var(--plum-deep)}
+.msg-head button{font-size:18px;color:var(--ink-soft);width:30px;height:30px;border-radius:50%}
+.msg-head button:hover{background:rgba(196,162,101,.15);color:var(--plum)}
+.msg-list{flex:1;overflow-y:auto;padding:10px 14px}
+.msg-item{
+  padding:12px 14px;margin-bottom:8px;border-radius:12px;
+  background:rgba(255,255,255,.7);border:1px solid var(--gold-soft);
+  cursor:pointer;transition:.2s;position:relative;
 }
-.bg-preview img{width:100%;height:100%;object-fit:cover;display:block}
-.bg-preview .placeholder{
-  font-size:11.5px;letter-spacing:.22em;color:#BBAFB5;font-style:italic;
+.msg-item:hover{background:#fff}
+.msg-item.unread{background:linear-gradient(140deg,rgba(217,167,167,.15),rgba(196,162,101,.15));border-color:var(--gold)}
+.msg-item.unread::before{content:'';position:absolute;top:14px;left:14px;width:6px;height:6px;border-radius:50%;background:#D98888}
+.msg-item .m-title{font-size:13px;color:var(--plum-deep);margin:0 0 4px 0;padding-left:12px;letter-spacing:.04em}
+.msg-item:not(.unread) .m-title{padding-left:0}
+.msg-item .m-body{font-size:12px;color:var(--ink-soft);line-height:1.6;padding-left:12px}
+.msg-item:not(.unread) .m-body{padding-left:0}
+.msg-item .m-time{font-size:10px;color:#BBAFB5;margin-top:4px;padding-left:12px}
+.msg-item:not(.unread) .m-time{padding-left:0}
+.msg-item .m-close{
+  position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;
+  color:#BBAFB5;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
 }
-.bg-actions{display:flex;gap:8px}
-.bg-actions .btn{flex:1;text-align:center}
-
-.room-box{
-  font-size:12px;line-height:1.9;letter-spacing:.03em;
-  padding:14px 16px;border-radius:12px;
-  background:rgba(196,162,101,.08);
-  border:1px dashed var(--gold-soft);
-  color:var(--ink-soft);
-  word-break:break-all;
-  margin-bottom:12px;
+.msg-item .m-close:hover{background:rgba(196,162,101,.15);color:var(--plum)}
+.msg-empty{text-align:center;color:#BBAFB5;font-size:13px;font-style:italic;padding:40px 0}
+.msg-backdrop{
+  position:fixed;inset:0;background:rgba(70,48,57,.25);z-index:140;
+  opacity:0;pointer-events:none;transition:.3s;
 }
-.room-box .label{
-  display:block;font-size:10.5px;letter-spacing:.24em;color:var(--gold);
-  margin-bottom:6px;
-}
-.room-box .code{
-  font-family:ui-monospace,Menlo,monospace;font-size:12px;
-  color:var(--plum);user-select:all;
-}
-
-.manual-sync{margin-top:6px}
-.manual-sync .manual-actions{display:flex;gap:8px;margin-top:8px}
-.manual-sync .manual-actions .btn{flex:1}
-
-.welcome-mask{
-  position:fixed;inset:0;z-index:400;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(253,250,246,.55);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  animation:fadeIn .35s ease;
-  padding:20px;
-}
-.welcome{
-  width:min(430px,100%);padding:40px 34px 34px;text-align:center;
-  background:rgba(255,255,255,.88);
-  animation:popIn .45s cubic-bezier(.2,.9,.3,1);
-}
-.welcome h2{
-  margin:0;font-size:30px;font-weight:600;letter-spacing:.4em;color:var(--plum-deep);
-  text-indent:.4em;
-}
-.welcome .sub{
-  margin:8px 0 20px;font-size:10.5px;letter-spacing:.4em;color:var(--gold);
-  text-transform:uppercase;text-indent:.4em;
-}
-.welcome .desc{
-  margin:0 0 28px;font-size:13.5px;line-height:2;letter-spacing:.14em;
-  color:var(--ink-soft);font-style:italic;
-}
-.welcome-actions{display:flex;flex-direction:column;gap:10px}
-.welcome-actions .btn{width:100%;padding:12px 18px;font-size:13.5px}
-.welcome-result{margin-top:6px}
-.invite-link{
-  padding:12px 14px;border-radius:12px;
-  background:rgba(196,162,101,.10);
-  border:1px dashed var(--gold-soft);
-  font-family:ui-monospace,Menlo,monospace;
-  font-size:11px;color:var(--plum);
-  word-break:break-all;text-align:left;
-  margin:10px 0 12px;
-  user-select:all;
-}
-.welcome-join{margin-top:6px}
-.welcome-join input{
-  width:100%;border:1px solid var(--gold-soft);border-radius:12px;
-  background:rgba(255,255,255,.75);outline:none;font-family:inherit;
-  font-size:14px;color:var(--ink);padding:11px 14px;
-  transition:.24s;
-}
-.welcome-join input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,162,101,.12)}
-
-.hidden{display:none!important}
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(196,162,101,.28);border-radius:10px;border:2px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:rgba(196,162,101,.5);background-clip:content-box}
+.msg-backdrop.show{opacity:1;pointer-events:auto}
 
 .toast{
-  position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(20px);
-  background:rgba(70,48,57,.92);color:#fff;padding:11px 24px;border-radius:999px;
-  font-size:13px;letter-spacing:.16em;z-index:500;opacity:0;pointer-events:none;
-  transition:.35s cubic-bezier(.2,.9,.3,1);box-shadow:0 10px 30px rgba(70,48,57,.28);
+  position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+  background:rgba(70,48,57,.92);color:#fff;padding:10px 20px;
+  border-radius:999px;font-size:12.5px;letter-spacing:.12em;z-index:500;
+  opacity:0;pointer-events:none;transition:.35s cubic-bezier(.2,.9,.3,1);
   max-width:80vw;text-align:center;line-height:1.5;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-@media(max-width:960px){
-  .layout{grid-template-columns:1fr;padding:20px 18px 70px;gap:18px}
-  .topbar{padding:14px 20px}
-  .brand h1{font-size:20px;letter-spacing:.24em}
-  .brand .en{display:none}
-  .tabs{width:100%;justify-content:space-between}
-  .tab{flex:1;padding:10px 0;text-align:center}
-  .album-grid{grid-template-columns:1fr}
-  .calendar{padding:18px 14px}
-  .cal-day{border-radius:12px;font-size:14px}
-  .sync-badge span:last-child{display:none}
-  .sync-badge{padding:6px 8px}
+.invite-notice{
+  position:fixed;left:50%;top:70px;transform:translateX(-50%) translateY(-10px);
+  z-index:450;padding:12px 20px;border-radius:16px;
+  background:linear-gradient(140deg,rgba(201,162,117,.95),rgba(185,140,160,.95));
+  color:#fff;font-size:13px;letter-spacing:.05em;
+  box-shadow:0 10px 30px rgba(185,140,160,.4);
+  cursor:pointer;opacity:0;pointer-events:none;transition:.4s cubic-bezier(.2,.9,.3,1);
+  max-width:90vw;
+}
+.invite-notice.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.invite-notice .in-title{font-weight:600;margin-bottom:3px;font-size:13.5px}
+.invite-notice .in-desc{font-size:11.5px;opacity:.9}
+
+.theme-preview-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:400;
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(70,48,57,.92);color:#fff;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 -6px 20px rgba(70,48,57,.3);
+}
+.theme-preview-bar .p-info{flex:1;font-size:12.5px;letter-spacing:.08em}
+.theme-preview-bar .btn{padding:7px 14px;font-size:12px}
+
+.welcome-mask{
+  position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;
+  background:rgba(253,250,246,.65);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  padding:20px;animation:fadeIn .3s ease;
+}
+.welcome{
+  width:100%;max-width:380px;padding:36px 28px 30px;text-align:center;
+  background:rgba(255,255,255,.9);border-radius:24px;
+  border:1px solid var(--gold-soft);box-shadow:0 20px 50px rgba(70,48,57,.15);
+  animation:popIn .4s cubic-bezier(.2,.9,.3,1);
+}
+.welcome h2{margin:0;font-size:26px;font-weight:600;letter-spacing:.4em;color:var(--plum-deep);text-indent:.4em}
+.welcome .sub{margin:6px 0 16px;font-size:10px;letter-spacing:.4em;color:var(--gold);text-indent:.4em}
+.welcome .desc{margin:0 0 22px;font-size:13px;line-height:2;color:var(--ink-soft);font-style:italic;letter-spacing:.1em}
+.welcome-actions{display:flex;flex-direction:column;gap:8px}
+.welcome-actions .btn{width:100%;padding:11px 18px;font-size:13px}
+.invite-link{
+  padding:11px 13px;border-radius:12px;
+  background:rgba(196,162,101,.1);border:1px dashed var(--gold-soft);
+  font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--plum);
+  word-break:break-all;text-align:left;margin:10px 0 12px;user-select:all;
+}
+
+@media(orientation:landscape) and (max-height:500px){
+  .app{max-width:100%}
+  .topbar{padding:8px 20px}
+  .brand h1{font-size:16px}
+  .content{padding:10px 16px 14px}
+  .nav-btn .ico{font-size:18px}
+  .nav-btn{font-size:9px}
 }
 </style>
 </head>
@@ -443,228 +743,294 @@ body{
 <div class="bg-tint"></div>
 <canvas id="rain"></canvas>
 
-<div class="app">
+<div class="app" id="app">
   <header class="topbar">
     <div class="brand">
       <span class="mark">❦</span>
       <h1>梅雨季</h1>
-      <span class="en">Plum Rain Season</span>
+      <span class="en">Plum Rain</span>
     </div>
-    <div class="topbar-right">
-      <div class="sync-badge local" id="sync-badge" title="点击查看同步状态">
-        <span class="dot"></span><span>本地</span>
-      </div>
-      <button class="icon-btn" id="open-settings" title="设置">⚙</button>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-bell" title="消息">
+        🔔<span class="badge" id="bell-badge">0</span>
+        <span class="sync-dot local" id="sync-dot"></span>
+      </button>
+      <button class="icon-btn" id="btn-settings" title="设置">⚙</button>
     </div>
   </header>
 
-  <div class="layout">
-    <aside class="sidebar">
-      <div id="people"></div>
-      <div class="card corner quote-card">
-        我们隔着一场雨<br>
-        却淋着同一片天空
-        <span class="sep">◆ ◆ ◆</span>
-      </div>
-    </aside>
-
-    <main class="main">
-      <nav class="tabs">
-        <button class="tab active" data-view="journal">日志</button>
-        <button class="tab" data-view="album">相册</button>
-        <button class="tab" data-view="calendar">日历</button>
-      </nav>
-
-      <section class="view" id="view-journal">
-        <div class="card corner composer">
-          <div class="avatar A" id="composer-avatar"><span>·</span></div>
-          <textarea id="journal-input" placeholder="今天下雨了吗…"></textarea>
-          <div class="composer-side">
-            <label class="btn btn-ghost" style="display:inline-block">
+  <main class="content" id="content">
+    <section class="page active" id="page-journal">
+      <div class="card corner composer" id="composer">
+        <textarea id="journal-input" placeholder="今天下雨了吗…"></textarea>
+        <div class="composer-actions">
+          <div class="left">
+            <label class="btn btn-ghost btn-sm" style="display:inline-flex">
               配图
               <input type="file" id="journal-file" accept="image/*" hidden>
             </label>
-            <button class="btn btn-primary" id="journal-publish">发布</button>
           </div>
+          <button class="btn btn-primary btn-sm" id="btn-publish">发布</button>
         </div>
         <div class="preview-strip hidden" id="journal-preview"></div>
-        <div id="journal-list"></div>
-      </section>
+      </div>
+      <div id="journal-list"></div>
+      <div class="section-title" style="margin-top:20px">📷 相册</div>
+      <div style="text-align:right;margin-bottom:10px">
+        <label class="btn btn-ghost btn-sm" style="display:inline-flex">
+          上传照片
+          <input type="file" id="photo-file" accept="image/*" multiple hidden>
+        </label>
+      </div>
+      <div class="album-grid" id="album-grid"></div>
+    </section>
 
-      <section class="view hidden" id="view-album">
-        <div class="card corner composer" style="align-items:center">
-          <div style="flex:1">
-            <div style="font-size:15px;letter-spacing:.16em;color:var(--plum-deep)">相册</div>
-            <div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;letter-spacing:.1em">
-              把那些淋过雨的瞬间，都收进来。
-            </div>
-          </div>
-          <label class="btn btn-primary" style="display:inline-block">
-            上传照片
-            <input type="file" id="photo-file" accept="image/*" multiple hidden>
+    <section class="page" id="page-survey">
+      <div class="card corner survey-actions">
+        <p class="desc">上传一份 docx 问卷，对方打开时会收到提醒。<br>第一行是问卷标题，之后每行一题。</p>
+        <div class="btn-group">
+          <label class="btn btn-primary" style="display:inline-flex">
+            上传问卷
+            <input type="file" id="survey-file" accept=".docx" hidden>
           </label>
         </div>
-        <div class="album-grid" id="album-grid"></div>
-      </section>
+      </div>
+      <div id="survey-list"></div>
+    </section>
 
-      <section class="view hidden" id="view-calendar">
-        <div class="card corner calendar">
-          <div class="cal-head">
-            <div class="cal-title">
-              <h2 id="cal-title">—</h2>
-              <span id="cal-sub">Calendar</span>
-            </div>
-            <div class="cal-nav">
-              <button id="cal-prev">‹</button>
-              <button id="cal-next">›</button>
-            </div>
+    <section class="page" id="page-mystic">
+      <div class="mystic-tabs">
+        <button class="mt-btn active" data-mt="tarot">塔罗</button>
+        <button class="mt-btn" data-mt="sign">抽签</button>
+      </div>
+
+      <div class="mystic-panel active" id="panel-tarot">
+        <div class="card corner tarot-setup" id="tarot-setup">
+          <p class="desc">静心默念你的问题，选择张数后开始洗牌。</p>
+          <div class="tarot-counts" id="tarot-counts">
+            <button data-c="3" class="active">3 张</button>
+            <button data-c="5">5 张</button>
+            <button data-c="7">7 张</button>
           </div>
-          <div class="cal-week">
-            <span>日</span><span>一</span><span>二</span><span>三</span>
-            <span>四</span><span>五</span><span>六</span>
-          </div>
-          <div class="cal-grid" id="cal-grid"></div>
-          <div class="day-panel">
-            <h4 id="day-panel-title">— 这一天 —</h4>
-            <div id="day-panel-body"></div>
-          </div>
+          <button class="btn btn-primary" id="btn-tarot-start">开始抽牌</button>
         </div>
-      </section>
-    </main>
-  </div>
+        <div id="tarot-stage" class="hidden">
+          <div class="tarot-hint">78 张完整牌 · 左右滑动查看 · 点选你想要的</div>
+          <div class="tarot-deck" id="tarot-deck">
+            <div class="tarot-row" id="tarot-row-1"></div>
+            <div class="tarot-row" id="tarot-row-2"></div>
+          </div>
+          <div class="tarot-result" id="tarot-result"></div>
+          <button class="btn btn-ghost btn-block" id="btn-tarot-reset" style="margin-top:12px">重新抽牌</button>
+        </div>
+      </div>
+
+      <div class="mystic-panel" id="panel-sign">
+        <div class="sign-bg" id="sign-bg">
+          <div class="sign-bg-drops"></div>
+          <button class="glass-btn" id="btn-sign">抽 签</button>
+        </div>
+        <div class="sign-result" id="sign-result">
+          <div class="sr-num" id="sr-num">第 1 签</div>
+          <div class="sr-level" id="sr-level">上上签</div>
+          <div class="sr-text" id="sr-text">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-settings">
+      <div class="section-title">👤 身份</div>
+      <div class="people-row" id="people-row"></div>
+      <button class="btn btn-ghost btn-block" id="btn-edit-me" style="margin-bottom:6px">编辑我的资料</button>
+
+      <div class="section-title">🎨 外观</div>
+      <div class="field">
+        <label>背景壁纸</label>
+        <div class="bg-preview" id="bg-preview">— 暂无壁纸 —</div>
+        <div class="bg-actions">
+          <label class="btn btn-ghost btn-sm" style="display:inline-flex">
+            上传
+            <input type="file" id="bg-file" accept="image/*" hidden>
+          </label>
+          <button class="btn btn-ghost btn-sm" id="btn-bg-clear">清除</button>
+          <button class="btn btn-ghost btn-sm" id="btn-bg-reset">恢复默认</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>玻璃透明度 <span class="val" id="val-alpha">55%</span></label>
+        <input type="range" id="sl-alpha" min="0" max="100" value="55">
+      </div>
+      <div class="field">
+        <label>玻璃模糊度 <span class="val" id="val-blur">20px</span></label>
+        <input type="range" id="sl-blur" min="0" max="60" value="20">
+      </div>
+      <div class="field">
+        <label>背景柔光层 <span class="val" id="val-tint">10%</span></label>
+        <input type="range" id="sl-tint" min="0" max="80" value="10">
+      </div>
+
+      <div class="section-title">🎭 主题（CSS）</div>
+      <p style="font-size:11.5px;color:var(--ink-soft);line-height:1.8;margin:0 0 10px">
+        点“新建主题”，把 CSS 代码直接粘贴进去，保存后即可预览应用。
+      </p>
+      <div id="theme-list"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-primary btn-sm" style="flex:1" id="btn-theme-new">＋ 新建主题</button>
+      </div>
+
+      <div class="section-title">🔗 房间与同步</div>
+      <div id="room-info"></div>
+      <p style="font-size:11.5px;color:var(--ink-soft);line-height:1.8;margin:8px 0">
+        同一房间的两个人，日志、相册、问卷、消息会实时同步。
+      </p>
+
+      <div class="section-title">💾 数据</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" id="btn-export">导出数据</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1" id="btn-import">导入数据</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-page="journal"><span class="ico">📖</span><span>日志相册</span></button>
+    <button class="nav-btn" data-page="survey"><span class="ico">📝</span><span>问卷</span></button>
+    <button class="nav-btn" data-page="mystic"><span class="ico">🔮</span><span>神秘学</span></button>
+    <button class="nav-btn" data-page="settings"><span class="ico">⚙</span><span>设置</span></button>
+  </nav>
 </div>
 
-<div class="modal-mask hidden" id="modal-mask">
-  <div class="card corner modal">
-    <h3>编 辑 资 料</h3>
+<div class="msg-backdrop" id="msg-backdrop"></div>
+<aside class="msg-panel" id="msg-panel">
+  <div class="msg-head">
+    <h3>消息</h3>
+    <button id="btn-msg-close">✕</button>
+  </div>
+  <div class="msg-list" id="msg-list"></div>
+</aside>
+
+<div class="modal-mask hidden" id="edit-mask">
+  <div class="modal">
+    <h3>编辑资料</h3>
     <div class="modal-avatar">
-      <div class="avatar" id="modal-avatar"></div>
+      <div class="mjy-avatar" id="edit-avatar"></div>
     </div>
     <div class="field">
       <label>昵称</label>
-      <input type="text" id="modal-name" maxlength="12" placeholder="怎么称呼你">
+      <input type="text" id="edit-name" maxlength="12" placeholder="怎么称呼你">
     </div>
     <div class="field">
       <label>此刻状态</label>
-      <input type="text" id="modal-status" maxlength="40" placeholder="比如：在窗边听雨">
+      <input type="text" id="edit-status" maxlength="40" placeholder="比如：在窗边听雨">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" id="modal-cancel">取消</button>
-      <button class="btn btn-primary" id="modal-save">保存</button>
+      <button class="btn btn-ghost" id="edit-cancel">取消</button>
+      <button class="btn btn-primary" id="edit-save">保存</button>
     </div>
-    <input type="file" id="modal-file" accept="image/*" hidden>
+    <input type="file" id="edit-file" accept="image/*" hidden>
   </div>
 </div>
 
-<div class="modal-mask hidden" id="setup-mask">
-  <div class="card corner modal" style="width:min(560px,calc(100vw - 40px))">
-    <h3>梅 雨 季 · 设 置</h3>
-
+<div class="modal-mask hidden" id="theme-editor-mask">
+  <div class="modal theme-editor-modal">
+    <h3 id="theme-editor-title">新建主题</h3>
     <div class="field">
-      <label>你的昵称</label>
-      <input type="text" id="setup-name" maxlength="12" placeholder="比如：雨">
+      <label>主题名称</label>
+      <input type="text" id="theme-editor-name" maxlength="30" placeholder="给这个主题起个名字">
     </div>
-
     <div class="field">
-      <label>你是第几位？</label>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-ghost slot-btn" data-slot="A" style="flex:1">1 号（雨）</button>
-        <button class="btn btn-ghost slot-btn" data-slot="B" style="flex:1">2 号（梅）</button>
-      </div>
-      <p class="hint" style="margin:10px 0 0"><b>重要</b>：两个人必须选不同的号。</p>
+      <label>CSS 代码</label>
+      <textarea id="theme-editor-css" placeholder="把 CSS 代码粘贴到这里…"></textarea>
     </div>
-
-    <div class="section-title">🎨 外 观 · 壁 纸 与 玻 璃</div>
-
-    <div class="field">
-      <label>背景壁纸</label>
-      <div class="bg-preview" id="bg-preview">
-        <span class="placeholder">— 暂无壁纸 —</span>
-      </div>
-      <div class="bg-actions">
-        <label class="btn btn-ghost" style="display:inline-block">
-          上传壁纸
-          <input type="file" id="setup-bg" accept="image/*" hidden>
-        </label>
-        <button class="btn btn-ghost" id="setup-bg-clear">清除</button>
-        <button class="btn btn-ghost" id="setup-bg-reset">恢复默认</button>
-      </div>
-      <p class="hint" style="margin:10px 0 0">壁纸只保存在本机，不会同步给对方。</p>
-    </div>
-
-    <div class="field">
-      <label>玻璃透明度 <span class="val" id="val-alpha">55%</span></label>
-      <input type="range" id="setup-alpha" min="0" max="100" value="55">
-    </div>
-
-    <div class="field">
-      <label>玻璃模糊度 <span class="val" id="val-blur">20px</span></label>
-      <input type="range" id="setup-blur" min="0" max="60" value="20">
-    </div>
-
-    <div class="field">
-      <label>背景柔光层 <span class="val" id="val-tint">10%</span></label>
-      <input type="range" id="setup-tint" min="0" max="80" value="10">
-    </div>
-
-    <div class="section-title">🔗 房 间 · 同 步</div>
-
-    <div class="manual-sync">
-      <p class="hint" style="margin:0 0 10px">
-        创建一个房间，把链接发给 TA，TA 打开就会自动连上同一个房间，两边实时同步。<br>
-        全程不用令牌、不用注册。
-      </p>
-
-      <div id="room-info" class="hidden">
-        <div class="room-box">
-          <span class="label">房间码</span>
-          <span class="code" id="room-id-display">—</span>
-        </div>
-        <div class="room-box">
-          <span class="label">邀请链接（发给 TA）</span>
-          <span class="code" id="room-link-display">—</span>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button class="btn btn-ghost" id="setup-copy-link" style="flex:1">复制邀请链接</button>
-          <button class="btn btn-ghost" id="setup-leave" style="flex:1;color:#B08A8A">退出房间</button>
-        </div>
-      </div>
-
-      <div id="room-empty" class="hidden">
-        <button class="btn btn-primary" id="setup-create-room" style="width:100%">创建新房间</button>
-      </div>
-    </div>
-
     <div class="modal-actions">
-      <button class="btn btn-ghost" id="setup-cancel">取消</button>
-      <button class="btn btn-primary" id="setup-save">保存</button>
+      <button class="btn btn-ghost" id="theme-editor-cancel">取消</button>
+      <button class="btn btn-primary" id="theme-editor-save">保存并预览</button>
     </div>
   </div>
+</div>
+
+<div class="quiz-overlay hidden" id="quiz-overlay">
+  <div class="quiz-box">
+    <div class="quiz-head">
+      <h3 id="quiz-title">问卷</h3>
+      <button class="quiz-close" id="quiz-close">✕</button>
+    </div>
+    <div class="quiz-progress" id="quiz-progress">1 / 1</div>
+    <div class="quiz-progress-bar"><i id="quiz-bar" style="width:100%"></i></div>
+    <div class="quiz-question" id="quiz-question">—</div>
+    <textarea class="quiz-answer" id="quiz-answer" placeholder="写下你的回答…"></textarea>
+    <div class="quiz-actions">
+      <button class="btn btn-ghost" id="quiz-prev">上一题</button>
+      <button class="btn btn-primary" id="quiz-next">下一题</button>
+    </div>
+  </div>
+</div>
+
+<div class="theme-preview-bar hidden" id="theme-preview-bar">
+  <div class="p-info" id="theme-preview-info">主题预览中…</div>
+  <button class="btn btn-ghost" id="btn-theme-cancel" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">取消</button>
+  <button class="btn btn-primary" id="btn-theme-apply">应用</button>
 </div>
 
 <div class="welcome-mask hidden" id="welcome-mask">
-  <div class="card corner welcome">
+  <div class="welcome">
     <h2>梅雨季</h2>
     <p class="sub">Plum Rain Season</p>
     <p class="desc">我们隔着一场雨<br>却淋着同一片天空</p>
-
     <div class="welcome-actions" id="welcome-main">
-      <button class="btn btn-primary" id="btn-create">创建我们的房间</button>
-      <button class="btn btn-ghost" id="btn-join">我有房间码</button>
-      <button class="btn btn-ghost" id="btn-skip" style="font-size:11.5px;color:#B0A4AA">先不用，只用本地</button>
+      <button class="btn btn-primary" id="w-create">创建我们的房间</button>
+      <button class="btn btn-ghost" id="w-join">我有房间码</button>
+      <button class="btn btn-ghost" id="w-skip" style="font-size:11.5px;color:#B0A4AA">先不用，只用本地</button>
     </div>
-
-    <div class="welcome-result hidden" id="welcome-result">
-      <p class="hint" style="margin:6px 0 0">把下面的链接发给 TA，TA 打开就能加入：</p>
-      <div class="invite-link" id="invite-link">—</div>
-      <button class="btn btn-ghost" id="btn-copy-link" style="width:100%">复制邀请链接</button>
-      <button class="btn btn-primary" id="btn-enter" style="width:100%;margin-top:8px">进入梅雨季</button>
+    <div class="hidden" id="w-result">
+      <p style="font-size:11.5px;color:var(--ink-soft);margin:6px 0 0">把下面的链接发给 TA：</p>
+      <div class="invite-link" id="w-link">—</div>
+      <button class="btn btn-ghost btn-block" id="w-copy">复制邀请链接</button>
+      <button class="btn btn-primary btn-block" id="w-enter" style="margin-top:8px">进入梅雨季</button>
     </div>
+    <div class="hidden" id="w-join-form">
+      <input type="text" id="w-join-input" placeholder="粘贴房间码或邀请链接" style="width:100%;border:1px solid var(--gold-soft);border-radius:12px;padding:10px 13px;font-size:14px;background:rgba(255,255,255,.7);outline:none;margin-bottom:10px">
+      <button class="btn btn-primary btn-block" id="w-join-confirm">加入房间</button>
+      <button class="btn btn-ghost btn-block" id="w-join-back" style="margin-top:6px">返回</button>
+    </div>
+  </div>
+</div>
 
-    <div class="welcome-join hidden" id="welcome-join">
-      <input type="text" id="join-input" placeholder="粘贴房间码或邀请链接">
-      <button class="btn btn-primary" id="btn-join-confirm" style="width:100%;margin-top:10px">加入房间</button>
-      <button class="btn btn-ghost" id="btn-join-back" style="width:100%;margin-top:8px">返回</button>
+<div class="invite-notice" id="invite-notice"></div>
+
+<div class="modal-mask hidden" id="export-mask">
+  <div class="modal" style="max-width:480px">
+    <h3>导出数据</h3>
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 10px">复制这串文字发给 TA，TA 点导入粘贴即可。</p>
+    <textarea id="export-text" readonly style="width:100%;height:160px;font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid var(--gold-soft);border-radius:10px;padding:10px;background:rgba(255,255,255,.7);outline:none;resize:none"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="export-close">关闭</button>
+      <button class="btn btn-primary" id="export-copy">复制</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask hidden" id="import-mask">
+  <div class="modal" style="max-width:480px">
+    <h3>导入数据</h3>
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 10px">粘贴 TA 发来的数据。</p>
+    <textarea id="import-text" placeholder="粘贴数据…" style="width:100%;height:160px;font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid var(--gold-soft);border-radius:10px;padding:10px;background:rgba(255,255,255,.7);outline:none;resize:none"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="import-close">取消</button>
+      <button class="btn btn-primary" id="import-confirm">导入</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask hidden" id="wallpaper-opt-mask">
+  <div class="modal">
+    <h3>应用主题时如何处理壁纸？</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-ghost btn-block" data-wp="keep">保留我现在的壁纸</button>
+      <button class="btn btn-ghost btn-block" data-wp="theme">使用主题包里的壁纸</button>
+      <button class="btn btn-ghost btn-block" data-wp="none">不使用壁纸（只换配色）</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="wp-cancel">取消</button>
     </div>
   </div>
 </div>
@@ -674,447 +1040,455 @@ body{
 <script>
 /* ============================================================
    工具
-   ============================================================ */
-const $  = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const pad = n => String(n).padStart(2, '0');
-const uid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-  const r = Math.random() * 16 | 0;
-  return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+============================================================ */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const pad=n=>String(n).padStart(2,'0');
+const uid=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+  const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);
 });
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const toTime = v => typeof v === 'number' ? v : new Date(v).getTime();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toTime=v=>typeof v==='number'?v:new Date(v).getTime();
 
-function fmtTime(t) {
-  const d = new Date(t), now = Date.now(), diff = now - t;
-  if (diff < 60e3) return '刚刚';
-  if (diff < 3600e3) return Math.floor(diff / 60e3) + ' 分钟前';
-  if (diff < 86400e3) return Math.floor(diff / 3600e3) + ' 小时前';
-  if (diff < 86400e3 * 7) return Math.floor(diff / 86400e3) + ' 天前';
+function fmtTime(t){
+  const d=new Date(t),now=Date.now(),diff=now-t;
+  if(diff<60e3)return '刚刚';
+  if(diff<3600e3)return Math.floor(diff/60e3)+' 分钟前';
+  if(diff<86400e3)return Math.floor(diff/3600e3)+' 小时前';
+  if(diff<86400e3*7)return Math.floor(diff/86400e3)+' 天前';
   return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
 }
 
 let toastTimer;
-function toast(msg, ms = 3000) {
-  const el = $('#toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+function toast(msg,ms=2400){
+  const el=$('#toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),ms);
 }
 
-function readImage(file, max = 800, quality = 0.65, maxBytes = 80000) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width: w, height: h } = img;
-        const scale = Math.min(1, max / Math.max(w, h));
-        w = Math.round(w * scale); h = Math.round(h * scale);
-        const cv = document.createElement('canvas');
-        cv.width = w; cv.height = h;
-        const ctx = cv.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        let q = quality;
-        let out = cv.toDataURL('image/jpeg', q);
-        while (out.length > maxBytes && q > 0.25) {
-          q -= 0.08;
-          out = cv.toDataURL('image/jpeg', q);
-        }
+function readImage(file,max=900,quality=0.72,maxBytes=200000){
+  return new Promise((resolve,reject)=>{
+    const fr=new FileReader();
+    fr.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let{width:w,height:h}=img;
+        const scale=Math.min(1,max/Math.max(w,h));
+        w=Math.round(w*scale);h=Math.round(h*scale);
+        const cv=document.createElement('canvas');
+        cv.width=w;cv.height=h;
+        const ctx=cv.getContext('2d');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        let q=quality;let out=cv.toDataURL('image/jpeg',q);
+        while(out.length>maxBytes&&q>0.28){q-=0.08;out=cv.toDataURL('image/jpeg',q);}
         resolve(out);
       };
-      img.onerror = reject;
-      img.src = fr.result;
+      img.onerror=reject;img.src=fr.result;
     };
-    fr.onerror = reject;
-    fr.readAsDataURL(file);
+    fr.onerror=reject;fr.readAsDataURL(file);
   });
 }
 
 /* ============================================================
-   配置
-   ============================================================ */
-const CFG_KEY = 'mjy-cfg-v11';
-const CACHE_KEY = 'mjy-cache-v11';
-const DEFAULT_NAMES = { A: '雨', B: '梅' };
-const DEFAULT_APPEARANCE = { glassAlpha: 0.55, glassBlur: 20, bgTint: 0.10, bg: '' };
+   配置 & 状态
+============================================================ */
+const CFG_KEY='mjy-cfg-v14';
+const CACHE_KEY='mjy-cache-v14';
+const DEFAULT_NAMES={A:'雨',B:'梅'};
+const DEFAULT_APPEARANCE={glassAlpha:0.55,glassBlur:20,bgTint:0.10,bg:''};
 
-let cfg = {};
-try { cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch(e) { cfg = {}; }
-cfg.appearance = Object.assign({}, DEFAULT_APPEARANCE, cfg.appearance || {});
+let cfg={};
+try{cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');}catch(e){cfg={};}
+cfg.appearance=Object.assign({},DEFAULT_APPEARANCE,cfg.appearance||{});
+cfg.themes=cfg.themes||{};
+cfg.activeTheme=cfg.activeTheme||null;
 
-function saveCfg() {
-  try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
-  catch(e) { toast('本地存储已满'); }
+function saveCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg));}catch(e){toast('本地存储已满');}}
+
+function applyAppearance(){
+  const a=cfg.appearance||{};
+  const alpha=Math.max(0,Math.min(1,a.glassAlpha??0.55));
+  const blur=Math.max(0,Math.min(80,a.glassBlur??20));
+  const tint=Math.max(0,Math.min(1,a.bgTint??0.10));
+  const root=document.documentElement;
+  root.style.setProperty('--glass-bg',`rgba(255,255,255,${alpha})`);
+  root.style.setProperty('--glass-blur',blur+'px');
+  root.style.setProperty('--bg-tint',`rgba(253,250,246,${tint})`);
+  root.style.setProperty('--bg-url',a.bg?`url("${a.bg}")`:'none');
 }
 
-function applyAppearance() {
-  const a = cfg.appearance || {};
-  const alpha = Math.max(0, Math.min(1, a.glassAlpha ?? 0.55));
-  const blur  = Math.max(0, Math.min(80, a.glassBlur ?? 20));
-  const tint  = Math.max(0, Math.min(1, a.bgTint ?? 0.10));
-  const root  = document.documentElement;
-  root.style.setProperty('--glass-bg', `rgba(255,255,255,${alpha})`);
-  root.style.setProperty('--glass-blur', blur + 'px');
-  root.style.setProperty('--bg-tint', `rgba(253,250,246,${tint})`);
-  root.style.setProperty('--bg-url', a.bg ? `url("${a.bg}")` : 'none');
-}
-
-const state = {
-  me: cfg.slot || null,
-  users: {
-    A: { id:'A', name: DEFAULT_NAMES.A, avatar:'', status:'', updatedAt: 0 },
-    B: { id:'B', name: DEFAULT_NAMES.B, avatar:'', status:'', updatedAt: 0 }
+const state={
+  me:cfg.slot||null,
+  users:{
+    A:{id:'A',name:DEFAULT_NAMES.A,avatar:'',status:'',updatedAt:0},
+    B:{id:'B',name:DEFAULT_NAMES.B,avatar:'',status:'',updatedAt:0}
   },
-  journals: [],
-  photos: [],
-  comments: []
+  journals:[],photos:[],comments:[],
+  surveys:[],
+  messages:[]
 };
 
 /* ============================================================
-   MQTT 同步（公共 broker，无需注册 / 令牌）
-   ============================================================ */
-const BROKERS = [
+   MQTT 同步
+============================================================ */
+const BROKERS=[
   'wss://broker.emqx.io:8084/mqtt',
   'wss://test.mosquitto.org:8081/mqtt',
   'wss://broker.hivemq.com:8884/mqtt'
 ];
-let mqttClient = null;
-let mqttBrokerIdx = 0;
-let mqttConnected = false;
-let mqttReconnectTimer = null;
-let lastPublishTime = 0;
+let mqttClient=null,mqttBrokerIdx=0,mqttConnected=false,mqttReconnectTimer=null;
 
-function roomTopic() {
-  return 'meiyuji/' + cfg.roomId;
+function roomTopic(){return 'meiyuji2/'+cfg.roomId;}
+function isCloudReady(){return !!cfg.roomId;}
+
+function setSyncStatus(s){
+  const dot=$('#sync-dot');
+  dot.className='sync-dot';
+  if(s==='online')dot.classList.add('online');
+  else if(s==='syncing')dot.classList.add('syncing');
+  else if(s==='error')dot.classList.add('error');
 }
 
-function isCloudReady() {
-  return !!cfg.roomId;
-}
-
-function connectMQTT() {
-  if (!isCloudReady()) return;
-  if (mqttClient) {
-    try { mqttClient.end(true); } catch(e) {}
-    mqttClient = null;
-  }
-  mqttConnected = false;
-
+function connectMQTT(){
+  if(!isCloudReady())return;
+  if(mqttClient){try{mqttClient.end(true);}catch(e){}mqttClient=null;}
+  mqttConnected=false;
   setSyncStatus('syncing');
-  const url = BROKERS[mqttBrokerIdx];
-
-  try {
-    mqttClient = mqtt.connect(url, {
-      clientId: 'mjy_' + Math.random().toString(16).slice(2, 10),
-      clean: true,
-      connectTimeout: 10000,
-      reconnectPeriod: 0,  // 我们自己控制重连
-      keepalive: 30,
-      protocolVersion: 4
+  const url=BROKERS[mqttBrokerIdx];
+  try{
+    mqttClient=mqtt.connect(url,{
+      clientId:'mjy_'+Math.random().toString(16).slice(2,10),
+      clean:true,connectTimeout:10000,reconnectPeriod:0,keepalive:30,protocolVersion:4
     });
-  } catch (e) {
-    console.error('MQTT 初始化失败', e);
-    tryNextBroker();
-    return;
-  }
+  }catch(e){tryNextBroker();return;}
 
-  mqttClient.on('connect', () => {
-    mqttConnected = true;
-    setSyncStatus('online');
-    console.log('[MQTT] 已连接：' + url);
-
-    // 订阅房间主题 + 同步请求主题
-    mqttClient.subscribe(roomTopic(), { qos: 0 });
-    mqttClient.subscribe(roomTopic() + '/request', { qos: 0 });
-
-    // 请求对方发一次最新数据
-    mqttClient.publish(roomTopic() + '/request', JSON.stringify({
-      from: state.me || 'unknown',
-      t: Date.now()
-    }), { qos: 0, retain: false });
-
-    // 如果本地已有数据，也发一份（retain 让新来的人立即收到）
-    if (state.journals.length || state.photos.length || state.users.A.updatedAt || state.users.B.updatedAt) {
-      publishFullState();
-    }
+  mqttClient.on('connect',()=>{
+    mqttConnected=true;setSyncStatus('online');
+    mqttClient.subscribe(roomTopic(),{qos:0});
+    mqttClient.subscribe(roomTopic()+'/req',{qos:0});
+    mqttClient.publish(roomTopic()+'/req',JSON.stringify({from:state.me||'?',t:Date.now()}),{qos:0});
+    if(hasLocalData())publishFullState();
   });
 
-  mqttClient.on('message', (topic, payload) => {
-    let data;
-    try {
-      data = JSON.parse(payload.toString());
-    } catch (e) {
+  mqttClient.on('message',(topic,payload)=>{
+    let data;try{data=JSON.parse(payload.toString());}catch(e){return;}
+    if(topic===roomTopic()+'/req'){
+      if(data&&data.from!==state.me)publishFullState();
       return;
     }
-
-    if (topic === roomTopic() + '/request') {
-      // 对方请求数据，我回一份
-      if (data && data.from !== state.me) {
-        publishFullState();
-      }
-      return;
-    }
-
-    if (topic === roomTopic()) {
-      // 收到全量数据
-      if (data && data.__from !== state.me) {
-        mergeRemote(data);
-        saveLocal();
-        renderAllPreservingInputs();
+    if(topic===roomTopic()){
+      if(data&&data.__from!==state.me){
+        mergeRemote(data);saveLocal();renderAll();
+        checkInvites();
       }
     }
   });
 
-  mqttClient.on('error', (err) => {
-    console.warn('[MQTT] 错误', err);
-    setSyncStatus('error');
-  });
-
-  mqttClient.on('close', () => {
-    mqttConnected = false;
-    setSyncStatus('error');
-    // 5 秒后尝试重连（或换下一个 broker）
+  mqttClient.on('error',()=>setSyncStatus('error'));
+  mqttClient.on('close',()=>{
+    mqttConnected=false;setSyncStatus('error');
     clearTimeout(mqttReconnectTimer);
-    mqttReconnectTimer = setTimeout(() => {
-      if (!mqttConnected) tryNextBroker();
-    }, 5000);
+    mqttReconnectTimer=setTimeout(()=>{if(!mqttConnected)tryNextBroker();},5000);
   });
-
-  // 10 秒内没连上，换下一个 broker
-  setTimeout(() => {
-    if (!mqttConnected) {
-      console.warn('[MQTT] 连接超时，切换 broker');
-      tryNextBroker();
-    }
-  }, 10000);
+  setTimeout(()=>{if(!mqttConnected)tryNextBroker();},10000);
 }
-
-function tryNextBroker() {
-  mqttBrokerIdx = (mqttBrokerIdx + 1) % BROKERS.length;
-  if (mqttClient) {
-    try { mqttClient.end(true); } catch(e) {}
-    mqttClient = null;
-  }
+function tryNextBroker(){
+  mqttBrokerIdx=(mqttBrokerIdx+1)%BROKERS.length;
+  if(mqttClient){try{mqttClient.end(true);}catch(e){}mqttClient=null;}
   connectMQTT();
 }
-
-function publishFullState() {
-  if (!mqttConnected || !mqttClient) return;
-  const data = exportState();
-  data.__from = state.me;
-  const str = JSON.stringify(data);
-
-  // 公共 broker 通常限 1MB，超过就压缩图片
-  if (str.length > 900000) {
-    toast('数据太大，请减少图片再同步', 5000);
-    return;
-  }
-
-  mqttClient.publish(roomTopic(), str, { qos: 0, retain: true });
-  lastPublishTime = Date.now();
+function hasLocalData(){
+  return state.journals.length||state.photos.length||state.surveys.length||
+         state.users.A.updatedAt||state.users.B.updatedAt||state.messages.length;
+}
+function publishFullState(){
+  if(!mqttConnected||!mqttClient)return;
+  const data=exportState();data.__from=state.me;
+  const str=JSON.stringify(data);
+  if(str.length>900000){toast('数据太大，请减少图片再同步',5000);return;}
+  mqttClient.publish(roomTopic(),str,{qos:0,retain:true});
   setSyncStatus('online');
 }
 
-/* ============================================================
-   合并数据
-   ============================================================ */
-function mergeList(local, remote) {
-  const map = new Map();
-  [...local, ...remote].forEach(item => {
-    if (!item || !item.id) return;
-    const prev = map.get(item.id);
-    if (!prev) {
-      map.set(item.id, item);
-    } else {
-      const a = prev.updatedAt || prev.time || 0;
-      const b = item.updatedAt || item.time || 0;
-      if (b > a) map.set(item.id, item);
+function mergeList(local,remote){
+  const map=new Map();
+  [...local,...remote].forEach(item=>{
+    if(!item||!item.id)return;
+    const prev=map.get(item.id);
+    if(!prev)map.set(item.id,item);
+    else{
+      const a=prev.updatedAt||prev.time||0;
+      const b=item.updatedAt||item.time||0;
+      if(b>a)map.set(item.id,item);
     }
   });
-  return [...map.values()];
+  return[...map.values()];
 }
 
-function mergeRemote(remote) {
-  if (!remote) return;
-  ['A','B'].forEach(slot => {
-    const r = remote.users && remote.users[slot];
-    const l = state.users[slot];
-    if (r && (!l.updatedAt || (r.updatedAt || 0) > (l.updatedAt || 0))) {
-      state.users[slot] = {
-        id: slot,
-        name: r.name || DEFAULT_NAMES[slot],
-        avatar: r.avatar || '',
-        status: r.status || '',
-        updatedAt: r.updatedAt || 0
-      };
+function mergeRemote(remote){
+  if(!remote)return;
+  ['A','B'].forEach(slot=>{
+    const r=remote.users&&remote.users[slot];
+    const l=state.users[slot];
+    if(r&&(!l.updatedAt||(r.updatedAt||0)>(l.updatedAt||0))){
+      state.users[slot]={id:slot,name:r.name||DEFAULT_NAMES[slot],avatar:r.avatar||'',status:r.status||'',updatedAt:r.updatedAt||0};
     }
   });
-  state.journals = mergeList(state.journals, remote.journals || []);
-  state.photos = mergeList(state.photos, remote.photos || []);
-  state.comments = mergeList(state.comments, remote.comments || []);
+  state.journals=mergeList(state.journals,remote.journals||[]);
+  state.photos=mergeList(state.photos,remote.photos||[]);
+  state.comments=mergeList(state.comments,remote.comments||[]);
+  state.surveys=mergeList(state.surveys,remote.surveys||[]);
+  state.messages=mergeList(state.messages,remote.messages||[]);
 }
 
-/* ============================================================
-   导入导出
-   ============================================================ */
-function exportState() {
-  return {
-    version: 11,
-    users: state.users,
-    journals: state.journals,
-    photos: state.photos,
-    comments: state.comments,
-    updatedAt: Date.now()
+function exportState(){
+  return{
+    version:14,
+    users:state.users,
+    journals:state.journals,
+    photos:state.photos,
+    comments:state.comments,
+    surveys:state.surveys,
+    messages:state.messages,
+    updatedAt:Date.now()
   };
 }
-
-function applyLocal(d) {
-  if (d.users) {
-    ['A','B'].forEach(slot => {
-      if (d.users[slot]) {
-        state.users[slot] = {
-          id: slot,
-          name: d.users[slot].name || DEFAULT_NAMES[slot],
-          avatar: d.users[slot].avatar || '',
-          status: d.users[slot].status || '',
-          updatedAt: d.users[slot].updatedAt || 0
-        };
-      }
+function applyLocal(d){
+  if(d.users){
+    ['A','B'].forEach(slot=>{
+      if(d.users[slot])state.users[slot]={
+        id:slot,name:d.users[slot].name||DEFAULT_NAMES[slot],
+        avatar:d.users[slot].avatar||'',status:d.users[slot].status||'',
+        updatedAt:d.users[slot].updatedAt||0
+      };
     });
   }
-  state.journals = (d.journals || []).map(j => ({
-    id: j.id, author: j.author, text: j.text || '',
-    image: j.image || '', time: toTime(j.time),
-    updatedAt: j.updatedAt || toTime(j.time),
-    deleted: !!j.deleted
-  }));
-  state.photos = (d.photos || []).map(p => ({
-    id: p.id, author: p.author, src: p.src,
-    caption: p.caption || '', time: toTime(p.time),
-    updatedAt: p.updatedAt || toTime(p.time),
-    deleted: !!p.deleted
-  }));
-  state.comments = (d.comments || []).map(c => ({
-    id: c.id, parentType: c.parentType, parentId: c.parentId,
-    author: c.author, text: c.text, time: toTime(c.time),
-    updatedAt: c.updatedAt || toTime(c.time),
-    deleted: !!c.deleted
-  }));
+  state.journals=(d.journals||[]).map(j=>({...j,time:toTime(j.time),updatedAt:j.updatedAt||toTime(j.time)}));
+  state.photos=(d.photos||[]).map(p=>({...p,time:toTime(p.time),updatedAt:p.updatedAt||toTime(p.time)}));
+  state.comments=(d.comments||[]).map(c=>({...c,time:toTime(c.time),updatedAt:c.updatedAt||toTime(c.time)}));
+  state.surveys=(d.surveys||[]).map(s=>({...s,time:toTime(s.time),updatedAt:s.updatedAt||toTime(s.time)}));
+  state.messages=(d.messages||[]).map(m=>({...m,time:toTime(m.time),updatedAt:m.updatedAt||toTime(m.time)}));
 }
-
-function loadLocal() {
-  let d = null;
-  try { d = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch(e) {}
-  if (!d) {
-    d = {
-      users: {
-        A: { id:'A', name: DEFAULT_NAMES.A, avatar:'', status:'', updatedAt: 0 },
-        B: { id:'B', name: DEFAULT_NAMES.B, avatar:'', status:'', updatedAt: 0 }
-      },
-      journals: [],
-      photos: [],
-      comments: []
-    };
+function loadLocal(){
+  let d=null;
+  try{d=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');}catch(e){}
+  if(!d){
+    d={users:{A:{id:'A',name:DEFAULT_NAMES.A,avatar:'',status:'',updatedAt:0},B:{id:'B',name:DEFAULT_NAMES.B,avatar:'',status:'',updatedAt:0}},
+       journals:[],photos:[],comments:[],surveys:[],messages:[]};
     saveLocal(d);
   }
   applyLocal(d);
 }
-
-function saveLocal(d) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(d || exportState())); }
-  catch(e) { console.warn('本地缓存失败', e); }
+function saveLocal(d){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify(d||exportState()));}catch(e){console.warn('本地缓存失败',e);}
 }
 
-/* ============================================================
-   同步操作：本地改完立即通过 MQTT 广播
-   ============================================================ */
-async function syncOp(fn) {
-  const result = fn();
+async function syncOp(fn){
+  const result=fn();
   saveLocal();
-  // 广播全量数据（retain，让不在线的人下次上线也能收到）
-  if (mqttConnected && mqttClient) {
-    publishFullState();
-  }
+  if(mqttConnected&&mqttClient)publishFullState();
   return result;
 }
 
 /* ============================================================
-   状态显示
-   ============================================================ */
-function setSyncStatus(s) {
-  const el = $('#sync-badge');
-  const span = el.querySelector('span:last-child');
-  el.classList.remove('local', 'syncing', 'error');
-  if (s === 'online') { span.textContent = '已同步'; el.title = '实时同步中'; }
-  else if (s === 'syncing') { el.classList.add('syncing'); span.textContent = '连接中'; }
-  else if (s === 'error') { el.classList.add('error'); span.textContent = '重连中'; }
-  else { el.classList.add('local'); span.textContent = '本地'; el.title = '未加入房间，点击 ⚙ 设置'; }
+   主题翻译层
+============================================================ */
+const CLASS_MAP={
+  'message-sent':'mjy-bubble.mine',
+  'message-received':'mjy-bubble.theirs',
+  'echoes-bubble-user':'mjy-bubble.mine',
+  'echoes-bubble-other':'mjy-bubble.theirs',
+  'echoes-avatar':'mjy-avatar',
+  'echoes-avatar-img':'mjy-avatar img',
+  'echoes-avatar-fallback':'mjy-avatar',
+  'echoes-app':'mjy-app',
+  'echoes-chat-page':'mjy-app',
+  'echoes-app-chat':'mjy-app',
+  'echoes-input-area':'mjy-input-area',
+  'echoes-character-card':'mjy-card',
+  'echoes-diary-card':'mjy-card',
+  'echoes-forum-post-card':'mjy-card',
+  'echoes-shop-item-card':'mjy-card',
+  'echoes-bottom-dock':'mjy-bottom-nav',
+  'echoes-modal-container':'mjy-modal',
+  'echoes-toast-card':'mjy-toast',
+  'echoes-page-header':'mjy-topbar',
+  'echoes-chat-header':'mjy-topbar'
+};
+function translateCSS(css){
+  if(!css)return '';
+  let r=css;
+  const keys=Object.keys(CLASS_MAP).sort((a,b)=>b.length-a.length);
+  keys.forEach(k=>{
+    const target=CLASS_MAP[k];
+    const targetCls='.'+target.split('.').join('.');
+    const re=new RegExp('\\.'+k.replace(/[-]/g,'\\-')+'(?![\\w-])','g');
+    r=r.replace(re,targetCls);
+  });
+  return r;
+}
+function applyTheme(){
+  const old=document.getElementById('mjy-theme-style');
+  if(old)old.remove();
+  if(cfg.activeTheme&&cfg.themes[cfg.activeTheme]){
+    const t=cfg.themes[cfg.activeTheme];
+    const translated=translateCSS(t.css);
+    const style=document.createElement('style');
+    style.id='mjy-theme-style';
+    style.textContent=translated;
+    document.head.appendChild(style);
+  }
 }
 
 /* ============================================================
+   塔罗数据
+============================================================ */
+const TAROT_DATA=[
+  ['愚者','新的开始，带着好奇出发','冲动行事，需要三思'],
+  ['魔术师','行动力强，能掌控局势','自欺欺人，眼高手低'],
+  ['女祭司','静心聆听内心的声音','忽视直觉，封闭自我'],
+  ['女皇','丰盛与滋养，温柔以待','过度依赖，缺乏主见'],
+  ['皇帝','秩序与担当，掌握主动','固执己见，控制欲强'],
+  ['教皇','遵循传统，寻求指引','墨守成规，固步自封'],
+  ['恋人','心意相通，面临选择','犹豫不决，关系失衡'],
+  ['战车','意志坚定，勇往直前','方向不明，急于求成'],
+  ['力量','以柔克刚，耐心应对','信心不足，自我怀疑'],
+  ['隐者','独处思考，寻找答案','过度封闭，拒绝沟通'],
+  ['命运之轮','转机来临，顺其自然','时机未到，静待变化'],
+  ['正义','公平公正，因果分明','偏袒失衡，逃避责任'],
+  ['倒吊人','换个角度，以退为进','困于僵局，白白牺牲'],
+  ['死神','旧的结束，新的开始','抗拒改变，停滞不前'],
+  ['节制','平衡调和，把握分寸','走极端，失去耐心'],
+  ['恶魔','面对欲望，警惕执念','摆脱束缚，重获自由'],
+  ['高塔','突然的转变，破而后立','逃避危机，延迟崩塌'],
+  ['星星','希望降临，心愿将成','信心受挫，目标模糊'],
+  ['月亮','直觉敏锐，留意潜流','被幻觉迷惑，焦虑不安'],
+  ['太阳','光明与喜悦，诸事顺遂','暂时低落，仍有转机'],
+  ['审判','觉醒时刻，重新评估','逃避检讨，错过机会'],
+  ['世界','圆满完成，进入新阶段','功亏一篑，急于求成'],
+  ['权杖Ace','热情点燃，新计划启程','动力不足，计划受阻'],
+  ['权杖2','计划未来，把握当下','犹豫观望，错失良机'],
+  ['权杖3','开拓视野，初步成果','进展缓慢，眼光不足'],
+  ['权杖4','安稳庆祝，阶段性胜利','稳定受扰，庆典延后'],
+  ['权杖5','竞争冲突，各执己见','化解纷争，达成共识'],
+  ['权杖6','胜利归来，获得认可','骄傲自满，声誉受损'],
+  ['权杖7','坚守立场，勇敢应对','力不从心，节节败退'],
+  ['权杖8','进展迅速，消息传来','节奏混乱，延误频繁'],
+  ['权杖9','坚持到底，警惕疲惫','心力交瘁，防备过度'],
+  ['权杖10','负担沉重，临近终点','放下负担，学会分担'],
+  ['权杖侍从','热情好学，新的探索','三分钟热度，缺乏方向'],
+  ['权杖骑士','行动果断，满怀冲劲','冲动鲁莽，虎头蛇尾'],
+  ['权杖王后','热情大方，魅力四射','嫉妒掌控，情绪化'],
+  ['权杖国王','领导力强，视野广阔','独断专行，好大喜功'],
+  ['圣杯Ace','情感涌动，新的开始','情感封闭，心门难开'],
+  ['圣杯2','两心相悦，和谐合作','关系失衡，沟通不畅'],
+  ['圣杯3','友谊欢聚，共享喜悦','过度社交，迷失自我'],
+  ['圣杯4','静观其变，情绪低落','重新振作，接受邀请'],
+  ['圣杯5','失落悲伤，忽视所有','走出阴霾，看见希望'],
+  ['圣杯6','怀念过去，温柔记忆','沉溺回忆，止步不前'],
+  ['圣杯7','幻想繁多，需要抉择','看清现实，脚踏实地'],
+  ['圣杯8','主动离开，追寻意义','徘徊不前，难以割舍'],
+  ['圣杯9','心愿达成，心满意足','表面满足，内心空虚'],
+  ['圣杯10','圆满幸福，家庭和睦','关系紧张，理想落差'],
+  ['圣杯侍从','情感细腻，直觉敏锐','情绪化，逃避现实'],
+  ['圣杯骑士','温柔追求，浪漫表白','承诺难守，优柔寡断'],
+  ['圣杯王后','温柔包容，情感丰沛','情绪不稳，过度敏感'],
+  ['圣杯国王','沉稳包容，情绪成熟','情感压抑，冷漠疏离'],
+  ['宝剑Ace','思维清晰，真相显现','思绪混乱，判断失误'],
+  ['宝剑2','僵持局面，需做决断','打破僵局，正视矛盾'],
+  ['宝剑3','心痛伤心，真相伤人','走出伤痛，逐渐疗愈'],
+  ['宝剑4','休整调息，恢复元气','拒绝休息，透支自己'],
+  ['宝剑5','冲突失利，得不偿失','和解让步，放下争执'],
+  ['宝剑6','过渡时期，逐渐好转','停滞不前，难以放下'],
+  ['宝剑7','策略应对，保留底牌','谎言揭穿，失去信任'],
+  ['宝剑8','受困受限，自我设限','挣脱束缚，重获自由'],
+  ['宝剑9','焦虑不安，夜不能寐','走出阴影，曙光初现'],
+  ['宝剑10','谷底反弹，痛苦终结','缓慢恢复，避免重蹈'],
+  ['宝剑侍从','好奇敏锐，信息灵动','多疑多虑，流于表面'],
+  ['宝剑骑士','直率果断，快速行动','急躁冲动，欠缺考虑'],
+  ['宝剑王后','理性清醒，界限分明','尖酸刻薄，拒人千里'],
+  ['宝剑国王','理智权威，判断力强','冷酷无情，独断专行'],
+  ['星币Ace','务实开端，机会落地','计划落空，投入不足'],
+  ['星币2','灵活应变，收支平衡','手忙脚乱，难以兼顾'],
+  ['星币3','稳步合作，技艺精进','配合不佳，成果受限'],
+  ['星币4','稳固保守，把握所有','过度固执，错失机会'],
+  ['星币5','困顿艰难，仍不放弃','走出困境，得到援手'],
+  ['星币6','公平给予，互惠互利','施与失衡，财务不清'],
+  ['星币7','耐心等待，评估成果','急功近利，缺乏耐心'],
+  ['星币8','专注钻研，精益求精','敷衍了事，浅尝辄止'],
+  ['星币9','自给自足，优雅从容','过度依赖，缺乏底气'],
+  ['星币10','丰厚圆满，家族传承','财务纠纷，根基不稳'],
+  ['星币侍从','踏实好学，稳扎稳打','懒散拖延，目标不清'],
+  ['星币骑士','稳重可靠，按部就班','过于保守，进展缓慢'],
+  ['星币王后','务实温暖，持家有方','忽视自我，过度操劳'],
+  ['星币国王','富足稳重，成就丰盛','贪图享乐，固步自封']
+];
+
+const SIGN_DATA=[
+  ['上上签','你朝光走，光也刚好照在你身上。'],
+  ['中平签','慢一点没关系，花有花期，你也有时区。'],
+  ['中吉签','失去的，会换一种方式，悄悄回到你身旁。'],
+  ['中平签','认真生活的人，终会被生活温柔回应。'],
+  ['上上签','你送出的善意，会绕一圈，变成好运回到你身边。'],
+  ['中吉签','路远没关系，风会记得你走过的每一步。'],
+  ['上上签','你走的每一步，都在悄悄靠近想要的幸福。'],
+  ['中平签','不争不抢，心安之处，就是归途。'],
+  ['中吉签','知进退，懂分寸，刚刚好的路最长久。']
+];
+
+/* ============================================================
    渲染
-   ============================================================ */
-function avatarHTML(slot, extra = '') {
-  const u = state.users[slot];
-  const initial = (u.name || '·').slice(0, 1);
-  return `<div class="avatar ${slot} ${extra}">${
-    u.avatar ? `<img src="${u.avatar}" alt="">` : `<span>${esc(initial)}</span>`
+============================================================ */
+function avatarHTML(slot,extra=''){
+  const u=state.users[slot];
+  const initial=(u.name||'·').slice(0,1);
+  return `<div class="mjy-avatar ${slot} ${extra}">${
+    u.avatar?`<img src="${u.avatar}" alt="">`:`<span>${esc(initial)}</span>`
   }</div>`;
 }
-
-function renderPeople() {
-  if (!state.me) {
-    $('#people').innerHTML = `<div class="card corner quote-card" style="font-style:normal">还没有选择身份，点右上角 ⚙ 设置。</div>`;
-    return;
-  }
-  const order = state.me === 'B' ? ['B','A'] : ['A','B'];
-  $('#people').innerHTML = order.map(k => {
-    const u = state.users[k];
-    const isMe = k === state.me;
-    return `
-      <div class="card corner person" data-user="${k}">
-        ${avatarHTML(k)}
-        <div class="person-body">
-          <div class="person-top">
-            <h3>${esc(u.name)}</h3>
-            <span class="role">${isMe ? '我' : 'TA'}</span>
-          </div>
-          <p class="status">${esc(u.status) || '&nbsp;'}</p>
-        </div>
-        <button class="icon-btn edit-person" data-user="${k}" title="编辑资料">✎</button>
-      </div>`;
+function renderPeople(){
+  const box=$('#people-row');
+  if(!box)return;
+  box.innerHTML=['A','B'].map(k=>{
+    const u=state.users[k];const isMe=k===state.me;
+    return `<div class="person-mini" data-user="${k}">
+      ${avatarHTML(k)}
+      <div class="info"><h5>${esc(u.name)} ${isMe?'<span style="color:#C4A265;font-size:10px">·我</span>':''}</h5>
+      <p>${esc(u.status)||'&nbsp;'}</p></div>
+    </div>`;
   }).join('');
-
-  const ca = $('#composer-avatar');
-  const me = state.users[state.me];
-  ca.className = 'avatar ' + state.me;
-  ca.innerHTML = me.avatar
-    ? `<img src="${me.avatar}" alt="">`
-    : `<span>${esc((me.name || '·').slice(0,1))}</span>`;
 }
 
-function commentsFor(type, id) {
-  return state.comments
-    .filter(c => !c.deleted && c.parentType === type && c.parentId === id)
-    .sort((a, b) => a.time - b.time);
+function renderJournals(){
+  const list=[...state.journals].filter(j=>!j.deleted).sort((a,b)=>b.time-a.time);
+  const box=$('#journal-list');
+  if(!box)return;
+  if(!list.length){box.innerHTML=`<div class="empty">还没有日记，写下第一句吧。</div>`;return;}
+  box.innerHTML=list.map(j=>`
+    <article class="card corner entry">
+      ${j.author===state.me?`<button class="del-btn" data-kind="journal" data-id="${j.id}" title="删除">×</button>`:''}
+      <div class="entry-head">
+        ${avatarHTML(j.author)}
+        <div class="entry-meta">
+          <h4>${esc(state.users[j.author]?.name||'某人')}</h4>
+          <span>${fmtTime(j.time)}</span>
+        </div>
+      </div>
+      <div class="entry-text"><span class="mjy-bubble ${j.author===state.me?'mine':'theirs'}">${esc(j.text)}</span></div>
+      ${j.image?`<div class="entry-img"><img src="${j.image}" alt=""></div>`:''}
+      ${commentBlock(j,'journal')}
+    </article>`).join('');
 }
 
-function commentBlock(item, kind) {
-  const list = commentsFor(kind, item.id);
+function commentBlock(item,kind){
+  const list=state.comments.filter(c=>!c.deleted&&c.parentType===kind&&c.parentId===item.id).sort((a,b)=>a.time-b.time);
   return `
-    <div class="divider">◆</div>
     <div class="comments">
-      ${list.map(c => `
-        <div class="comment">
-          <b>${esc(state.users[c.author]?.name || '某人')}</b>
-          <span>${esc(c.text)}</span>
-          <span class="ct">${fmtTime(c.time)}</span>
-        </div>`).join('')}
+      ${list.map(c=>`<div class="comment">
+        <b>${esc(state.users[c.author]?.name||'某人')}</b>
+        <span>${esc(c.text)}</span>
+        <span class="ct">${fmtTime(c.time)}</span>
+      </div>`).join('')}
     </div>
     <div class="comment-box">
       <input type="text" placeholder="说点什么…" data-kind="${kind}" data-id="${item.id}">
@@ -1122,755 +1496,883 @@ function commentBlock(item, kind) {
     </div>`;
 }
 
-function renderJournals() {
-  const list = state.journals
-    .filter(j => !j.deleted)
-    .sort((a, b) => b.time - a.time);
-  const box = $('#journal-list');
-  if (!list.length) {
-    box.innerHTML = `<div class="card corner empty">还没有日记，写下第一句吧。</div>`;
-    return;
-  }
-  box.innerHTML = list.map(j => `
-    <article class="card corner entry">
-      ${j.author === state.me ? `<button class="del-btn" data-kind="journal" data-id="${j.id}" title="删除">×</button>` : ''}
-      <div class="entry-head">
-        ${avatarHTML(j.author)}
-        <div class="entry-meta">
-          <h4>${esc(state.users[j.author]?.name || '某人')}</h4>
-          <span>${fmtTime(j.time)}</span>
-        </div>
-      </div>
-      <div class="entry-text">${esc(j.text)}</div>
-      ${j.image ? `<div class="entry-img"><img src="${j.image}" alt=""></div>` : ''}
-      ${commentBlock(j, 'journal')}
-    </article>`).join('');
-}
-
-function renderAlbum() {
-  const list = state.photos
-    .filter(p => !p.deleted)
-    .sort((a, b) => b.time - a.time);
-  const box = $('#album-grid');
-  if (!list.length) {
-    box.innerHTML = `<div class="card corner empty" style="grid-column:1/-1">相册还是空的，上传第一张吧。</div>`;
-    return;
-  }
-  box.innerHTML = list.map(p => `
+function renderAlbum(){
+  const list=[...state.photos].filter(p=>!p.deleted).sort((a,b)=>b.time-a.time);
+  const box=$('#album-grid');
+  if(!box)return;
+  if(!list.length){box.innerHTML=`<div class="empty" style="grid-column:1/-1">相册还是空的。</div>`;return;}
+  box.innerHTML=list.map(p=>`
     <figure class="card corner photo">
-      ${p.author === state.me ? `<button class="del-btn" data-kind="photo" data-id="${p.id}" title="删除">×</button>` : ''}
+      ${p.author===state.me?`<button class="del-btn" data-kind="photo" data-id="${p.id}">×</button>`:''}
       <div class="photo-img"><img src="${p.src}" alt=""></div>
       <figcaption class="photo-body">
         <div class="photo-meta">
           ${avatarHTML(p.author)}
-          <span class="name">${esc(state.users[p.author]?.name || '某人')}</span>
+          <span>${esc(state.users[p.author]?.name||'某人')}</span>
           <span class="time">${fmtTime(p.time)}</span>
         </div>
-        ${p.caption ? `<p class="caption">${esc(p.caption)}</p>` : ''}
-        ${commentBlock(p, 'photo')}
+        ${p.caption?`<p class="caption">${esc(p.caption)}</p>`:''}
       </figcaption>
     </figure>`).join('');
 }
 
-let calCursor = new Date();
-let selectedDay = new Date();
-
-function sameDay(a, b) {
-  return a.getFullYear() === b.getFullYear()
-      && a.getMonth() === b.getMonth()
-      && a.getDate() === b.getDate();
-}
-function hasContentOn(date) {
-  return state.journals.some(j => !j.deleted && sameDay(new Date(j.time), date))
-      || state.photos.some(p => !p.deleted && sameDay(new Date(p.time), date));
-}
-
-function renderCalendar() {
-  const y = calCursor.getFullYear(), m = calCursor.getMonth();
-  $('#cal-title').textContent = `${y} 年 ${m + 1} 月`;
-  $('#cal-sub').textContent = new Date(y, m, 1)
-    .toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
-
-  const firstDay = new Date(y, m, 1).getDay();
-  const days = new Date(y, m + 1, 0).getDate();
-  const today = new Date();
-  let html = '';
-  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
-  for (let d = 1; d <= days; d++) {
-    const date = new Date(y, m, d);
-    const cls = ['cal-day',
-      sameDay(date, today) ? 'today' : '',
-      sameDay(date, selectedDay) ? 'selected' : ''
-    ].join(' ');
-    html += `<div class="${cls}" data-day="${d}">
-      <span>${d}</span>${hasContentOn(date) ? '<i class="dot"></i>' : ''}
+function renderSurveys(){
+  const box=$('#survey-list');
+  if(!box)return;
+  const list=[...state.surveys].filter(s=>!s.deleted).sort((a,b)=>b.time-a.time);
+  if(!list.length){box.innerHTML=`<div class="empty">还没有问卷，上传一份试试。</div>`;return;}
+  box.innerHTML=list.map(s=>{
+    const mine=state.me&&s.answers&&s.answers[state.me]&&s.answers[state.me].__done;
+    const fromMe=s.author===state.me;
+    return `<div class="card corner survey-item" data-id="${s.id}">
+      <div class="s-ico">📝</div>
+      <div class="s-body">
+        <h4>${esc(s.title)}</h4>
+        <p>${fromMe?'我出题':'对方出题'} · ${s.questions.length} 题 · ${fmtTime(s.time)}</p>
+      </div>
+      <span class="s-status ${mine?'done':'todo'}">${mine?'已答':'待答'}</span>
     </div>`;
-  }
-  $('#cal-grid').innerHTML = html;
-  renderDayPanel();
+  }).join('');
 }
 
-function renderDayPanel() {
-  const d = selectedDay;
-  $('#day-panel-title').textContent =
-    `— ${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日 —`;
-  const items = [];
-  state.journals.forEach(j => {
-    if (!j.deleted && sameDay(new Date(j.time), d))
-      items.push({ tag:'日志', text: j.text.slice(0, 60) + (j.text.length > 60 ? '…' : ''), time: j.time });
-  });
-  state.photos.forEach(p => {
-    if (!p.deleted && sameDay(new Date(p.time), d))
-      items.push({ tag:'照片', text: p.caption || '（无描述）', time: p.time });
-  });
-  items.sort((a, b) => a.time - b.time);
-  $('#day-panel-body').innerHTML = items.length
-    ? items.map(i => `<div class="day-item"><span class="tag">${i.tag}</span><span>${esc(i.text)}</span></div>`).join('')
-    : `<div class="empty" style="padding:20px 0">这一天很安静，只有雨声。</div>`;
+function renderMessages(){
+  const list=[...state.messages].sort((a,b)=>b.time-a.time);
+  const box=$('#msg-list');
+  const badge=$('#bell-badge');
+  const unread=list.filter(m=>!m.read&&m.to===state.me).length;
+  if(unread>0){badge.textContent=unread>99?'99+':unread;$('#btn-bell').classList.add('has-badge');}
+  else{$('#btn-bell').classList.remove('has-badge');}
+
+  if(!list.length){box.innerHTML=`<div class="msg-empty">还没有消息</div>`;return;}
+  box.innerHTML=list.map(m=>`
+    <div class="msg-item ${m.read?'':'unread'}" data-id="${m.id}" data-type="${m.type}" data-ref="${m.refId||''}">
+      <button class="m-close" data-id="${m.id}">✕</button>
+      <p class="m-title">${esc(m.title||'')}</p>
+      <p class="m-body">${esc(m.text||'')}</p>
+      <p class="m-time">${fmtTime(m.time)}${m.read?'':' · 未读'}</p>
+    </div>`).join('');
 }
 
-function renderAll() {
-  renderPeople();
-  renderJournals();
-  renderAlbum();
-  renderCalendar();
+function renderAll(){
+  renderPeople();renderJournals();renderAlbum();renderSurveys();renderMessages();
 }
 
-function renderAllPreservingInputs() {
-  const vals = {};
-  document.querySelectorAll('input[data-kind][data-id]').forEach(el => {
-    vals[`${el.dataset.kind}:${el.dataset.id}`] = el.value;
-  });
-  renderAll();
-  document.querySelectorAll('input[data-kind][data-id]').forEach(el => {
-    const k = `${el.dataset.kind}:${el.dataset.id}`;
-    if (vals[k]) el.value = vals[k];
-  });
+function checkInvites(){
+  if(!state.me)return;
+  const unread=state.messages.filter(m=>!m.read&&m.to===state.me&&m.type==='survey');
+  if(!unread.length)return;
+  const m=unread[unread.length-1];
+  const s=state.surveys.find(x=>x.id===m.refId);
+  if(!s)return;
+  showInviteNotice(m,s);
 }
-
-/* ============================================================
-   交互：标签
-   ============================================================ */
-$$('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    $$('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    $$('.view').forEach(v => v.classList.add('hidden'));
-    $('#view-' + tab.dataset.view).classList.remove('hidden');
-  });
-});
-
-/* ============================================================
-   交互：发布日志
-   ============================================================ */
-let pendingImage = '';
-
-$('#journal-file').addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  try { pendingImage = await readImage(f); }
-  catch (err) { toast('图片读取失败'); return; }
-  const strip = $('#journal-preview');
-  strip.innerHTML = `<img src="${pendingImage}" alt=""><button class="btn btn-ghost" id="rm-img" style="align-self:flex-start">移除</button>`;
-  strip.classList.remove('hidden');
-  $('#rm-img').onclick = () => {
-    pendingImage = '';
-    strip.classList.add('hidden');
-    strip.innerHTML = '';
-    $('#journal-file').value = '';
+let inviteTimer=null;
+function showInviteNotice(msg,survey){
+  const el=$('#invite-notice');
+  el.innerHTML=`<div class="in-title">${esc(state.users[msg.from]?.name||'TA')} 向你提问</div>
+    <div class="in-desc">「${esc(survey.title)}」· 点击开始答题</div>`;
+  el.classList.add('show');
+  el.onclick=()=>{
+    el.classList.remove('show');
+    msg.read=true;
+    syncOp(()=>{});
+    renderMessages();
+    openQuiz(survey.id);
   };
-});
+  clearTimeout(inviteTimer);
+  inviteTimer=setTimeout(()=>el.classList.remove('show'),8000);
+}
 
-$('#journal-publish').addEventListener('click', async () => {
-  if (!state.me) { toast('请先选择身份'); return; }
-  const ta = $('#journal-input');
-  const text = ta.value.trim();
-  if (!text && !pendingImage) return;
+let quizState={surveyId:null,idx:0};
 
-  const btn = $('#journal-publish');
-  btn.disabled = true; btn.textContent = '发布中';
+function openQuiz(id){
+  const s=state.surveys.find(x=>x.id===id);
+  if(!s)return;
+  if(!state.me){toast('请先在设置里选择身份');return;}
+  quizState.surveyId=id;
+  quizState.idx=0;
+  s.answers=s.answers||{};
+  s.answers[state.me]=s.answers[state.me]||{};
+  $('#quiz-title').textContent=s.title;
+  $('#quiz-overlay').classList.remove('hidden');
+  renderQuizQuestion();
+}
 
-  await syncOp(() => {
-    state.journals.push({
-      id: uid(), author: state.me, text, image: pendingImage,
-      time: Date.now(), updatedAt: Date.now(), deleted: false
+function renderQuizQuestion(){
+  const s=state.surveys.find(x=>x.id===quizState.surveyId);
+  if(!s)return;
+  const idx=quizState.idx;
+  const total=s.questions.length;
+  $('#quiz-progress').textContent=`${idx+1} / ${total}`;
+  $('#quiz-bar').style.width=((idx+1)/total*100)+'%';
+  $('#quiz-question').textContent=s.questions[idx];
+  const ans=(s.answers[state.me]&&s.answers[state.me][idx])||'';
+  $('#quiz-answer').value=ans;
+  $('#quiz-prev').style.visibility=idx>0?'visible':'hidden';
+  $('#quiz-next').textContent=idx===total-1?'完成':'下一题';
+}
+
+function saveQuizAnswer(){
+  const s=state.surveys.find(x=>x.id===quizState.surveyId);
+  if(!s)return;
+  s.answers=s.answers||{};
+  s.answers[state.me]=s.answers[state.me]||{};
+  s.answers[state.me][quizState.idx]=$('#quiz-answer').value;
+  s.updatedAt=Date.now();
+}
+
+async function finishQuiz(){
+  const s=state.surveys.find(x=>x.id===quizState.surveyId);
+  if(!s)return;
+  saveQuizAnswer();
+  s.answers[state.me].__done=true;
+  s.answers[state.me].__completedAt=Date.now();
+  await syncOp(()=>{});
+  $('#quiz-overlay').classList.add('hidden');
+  renderSurveys();
+  toast('已归档：'+s.title+'-'+(state.users[state.me]?.name||''));
+}
+
+async function handleSurveyFile(file){
+  if(!file)return;
+  if(!state.me){toast('请先选择身份');return;}
+  toast('解析中…');
+  try{
+    const arrayBuffer=await file.arrayBuffer();
+    const result=await mammoth.extractRawText({arrayBuffer});
+    const text=result.value||'';
+    const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+    if(!lines.length){toast('文档是空的');return;}
+    const title=lines[0];
+    const questions=lines.slice(1);
+    if(!questions.length){toast('至少需要一道题');return;}
+    const s={
+      id:uid(),author:state.me,title,
+      questions,
+      answers:{},
+      time:Date.now(),updatedAt:Date.now(),deleted:false
+    };
+    const target=state.me==='A'?'B':'A';
+    const msg={
+      id:uid(),to:target,from:state.me,type:'survey',refId:s.id,
+      title:'收到一份新问卷',
+      text:`「${title}」共 ${questions.length} 题`,
+      time:Date.now(),updatedAt:Date.now(),read:false
+    };
+    await syncOp(()=>{
+      state.surveys.push(s);
+      state.messages.push(msg);
     });
-  });
-
-  btn.disabled = false; btn.textContent = '发布';
-  ta.value = '';
-  pendingImage = '';
-  $('#journal-preview').classList.add('hidden');
-  $('#journal-preview').innerHTML = '';
-  $('#journal-file').value = '';
-  renderAll();
-});
-
-/* ============================================================
-   交互：上传照片
-   ============================================================ */
-$('#photo-file').addEventListener('change', async e => {
-  if (!state.me) { toast('请先选择身份'); return; }
-  const files = [...e.target.files];
-  if (!files.length) return;
-  toast(`正在处理 ${files.length} 张…`);
-
-  const items = [];
-  for (const f of files) {
-    try {
-      const src = await readImage(f);
-      items.push({
-        id: uid(), author: state.me, src, caption: '',
-        time: Date.now(), updatedAt: Date.now(), deleted: false
-      });
-    } catch (err) { console.error(err); }
+    renderAll();
+    toast('已上传');
+  }catch(e){
+    console.error(e);
+    toast('解析失败：'+e.message);
   }
-
-  if (!items.length) { e.target.value = ''; return; }
-
-  await syncOp(() => {
-    items.forEach(it => state.photos.push(it));
-  });
-
-  e.target.value = '';
-  renderAll();
-  toast('上传完成');
-});
+}
 
 /* ============================================================
-   交互：评论
-   ============================================================ */
-document.addEventListener('click', async e => {
-  const btn = e.target.closest('.send');
-  if (!btn) return;
-  if (!state.me) { toast('请先选择身份'); return; }
-  const { kind, id } = btn.dataset;
-  const input = document.querySelector(`input[data-kind="${kind}"][data-id="${id}"]`);
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
+   塔罗（两行横向）
+============================================================ */
+let tarotCount=3;
+let tarotPicked=[];
 
-  input.value = '';
-  await syncOp(() => {
-    state.comments.push({
-      id: uid(), parentType: kind, parentId: id,
-      author: state.me, text, time: Date.now(),
-      updatedAt: Date.now(), deleted: false
-    });
-  });
-  renderAllPreservingInputs();
-});
+function startTarot(){
+  const deck=[];
+  for(let i=0;i<TAROT_DATA.length;i++){
+    deck.push({idx:i, rev: Math.random()<0.5});
+  }
+  for(let i=deck.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]]=[deck[j],deck[i]];
+  }
+  tarotPicked=[];
+  window.__tarotDeck = deck;
 
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
-  const input = e.target.closest('input[data-kind]');
-  if (!input) return;
-  e.preventDefault();
-  const { kind, id } = input.dataset;
-  const btn = document.querySelector(`.send[data-kind="${kind}"][data-id="${id}"]`);
-  btn && btn.click();
-});
+  const half = Math.ceil(deck.length/2); // 39
+  const row1 = deck.slice(0, half);
+  const row2 = deck.slice(half);
 
-/* ============================================================
-   交互：删除
-   ============================================================ */
-document.addEventListener('click', async e => {
-  const btn = e.target.closest('.del-btn');
-  if (!btn) return;
-  const { kind, id } = btn.dataset;
-  if (!confirm('确定要删除吗？')) return;
+  $('#tarot-row-1').innerHTML = row1.map((d,i) =>
+    `<div class="tarot-card" data-i="${i}"></div>`
+  ).join('');
+  $('#tarot-row-2').innerHTML = row2.map((d,i) =>
+    `<div class="tarot-card" data-i="${i + half}"></div>`
+  ).join('');
 
-  await syncOp(() => {
-    const now = Date.now();
-    if (kind === 'journal') {
-      const j = state.journals.find(x => x.id === id);
-      if (j) { j.deleted = true; j.updatedAt = now; }
-      state.comments.forEach(c => {
-        if (c.parentType === 'journal' && c.parentId === id) {
-          c.deleted = true; c.updatedAt = now;
+  $('#tarot-result').innerHTML='';
+  $('#tarot-setup').classList.add('hidden');
+  $('#tarot-stage').classList.remove('hidden');
+
+  $('#tarot-row-1').scrollLeft = 0;
+  $('#tarot-row-2').scrollLeft = 0;
+}
+
+function pickTarotCard(el){
+  const i=+el.dataset.i;
+  if(tarotPicked.find(p=>p.i===i))return;
+  if(tarotPicked.length>=tarotCount)return;
+  spawnPetals(el);
+  const d = window.__tarotDeck[i];
+  tarotPicked.push({i, ...d});
+  setTimeout(()=>{
+    el.classList.add('picked');
+    renderTarotResult();
+  }, 200);
+  if(tarotPicked.length===tarotCount){
+    setTimeout(()=>{
+      $$('.tarot-card').forEach(c=>{
+        if(!c.classList.contains('picked')){
+          c.style.transition='opacity .6s';
+          c.style.opacity='.15';
+          c.style.pointerEvents='none';
         }
       });
-    } else if (kind === 'photo') {
-      const p = state.photos.find(x => x.id === id);
-      if (p) { p.deleted = true; p.updatedAt = now; }
-      state.comments.forEach(c => {
-        if (c.parentType === 'photo' && c.parentId === id) {
-          c.deleted = true; c.updatedAt = now;
-        }
-      });
-    }
-  });
-  renderAll();
-  toast('已删除');
-});
-
-/* ============================================================
-   交互：日历
-   ============================================================ */
-$('#cal-prev').addEventListener('click', () => {
-  calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
-  renderCalendar();
-});
-$('#cal-next').addEventListener('click', () => {
-  calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
-  renderCalendar();
-});
-$('#cal-grid').addEventListener('click', e => {
-  const cell = e.target.closest('.cal-day');
-  if (!cell || cell.classList.contains('empty')) return;
-  selectedDay = new Date(calCursor.getFullYear(), calCursor.getMonth(), +cell.dataset.day);
-  renderCalendar();
-});
-
-/* ============================================================
-   交互：编辑资料
-   ============================================================ */
-let editingUser = null;
-let editingAvatar = '';
-
-function openEditModal(slot) {
-  editingUser = slot;
-  const u = state.users[slot];
-  editingAvatar = u.avatar || '';
-  $('#modal-name').value = u.name;
-  $('#modal-status').value = u.status;
-  refreshModalAvatar();
-  $('#modal-mask').classList.remove('hidden');
-}
-function refreshModalAvatar() {
-  const el = $('#modal-avatar');
-  el.className = 'avatar ' + (editingUser || 'A');
-  el.innerHTML = editingAvatar
-    ? `<img src="${editingAvatar}" alt="">`
-    : `<span>${esc(($('#modal-name').value || '·').slice(0,1))}</span>`;
-}
-function closeEditModal() {
-  $('#modal-mask').classList.add('hidden');
-  editingUser = null;
-}
-
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.edit-person');
-  if (btn) openEditModal(btn.dataset.user);
-});
-
-$('#modal-avatar').addEventListener('click', () => $('#modal-file').click());
-$('#modal-name').addEventListener('input', refreshModalAvatar);
-
-$('#modal-file').addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  try {
-    editingAvatar = await readImage(f, 200, 0.7, 40000);
-    refreshModalAvatar();
-  } catch (err) { toast('头像处理失败'); }
-});
-
-$('#modal-cancel').addEventListener('click', closeEditModal);
-$('#modal-mask').addEventListener('click', e => {
-  if (e.target.id === 'modal-mask') closeEditModal();
-});
-
-$('#modal-save').addEventListener('click', async () => {
-  if (!editingUser) return;
-  const name = $('#modal-name').value.trim() || state.users[editingUser].name;
-  const status = $('#modal-status').value.trim();
-  await syncOp(() => {
-    Object.assign(state.users[editingUser], {
-      name, status, avatar: editingAvatar, updatedAt: Date.now()
-    });
-  });
-  closeEditModal();
-  renderAll();
-  toast('已保存');
-});
-
-/* ============================================================
-   交互：设置
-   ============================================================ */
-let setupSlot = state.me;
-
-function refreshBgPreview() {
-  const box = $('#bg-preview');
-  if (cfg.appearance.bg) {
-    box.innerHTML = `<img src="${cfg.appearance.bg}" alt="">`;
-  } else {
-    box.innerHTML = `<span class="placeholder">— 暂无壁纸 —</span>`;
+    }, 700);
   }
 }
 
-function syncAppearanceControls() {
-  const a = cfg.appearance;
-  $('#setup-alpha').value = Math.round((a.glassAlpha ?? 0.55) * 100);
-  $('#val-alpha').textContent = Math.round((a.glassAlpha ?? 0.55) * 100) + '%';
-  $('#setup-blur').value = Math.round(a.glassBlur ?? 20);
-  $('#val-blur').textContent = Math.round(a.glassBlur ?? 20) + 'px';
-  $('#setup-tint').value = Math.round((a.bgTint ?? 0.10) * 100);
-  $('#val-tint').textContent = Math.round((a.bgTint ?? 0.10) * 100) + '%';
-}
-
-function refreshRoomInfo() {
-  if (cfg.roomId) {
-    $('#room-info').classList.remove('hidden');
-    $('#room-empty').classList.add('hidden');
-    $('#room-id-display').textContent = cfg.roomId;
-    const link = `${location.origin}${location.pathname}#room=${cfg.roomId}`;
-    $('#room-link-display').textContent = link;
-  } else {
-    $('#room-info').classList.add('hidden');
-    $('#room-empty').classList.remove('hidden');
+function spawnPetals(el){
+  const box = $('#tarot-deck');
+  const boxRect = box.getBoundingClientRect();
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left - boxRect.left + rect.width/2;
+  const cy = rect.top - boxRect.top;
+  for(let i=0; i<12; i++){
+    const p = document.createElement('div');
+    p.className = 'petal';
+    p.style.left = (cx + (Math.random()-0.5)*40) + 'px';
+    p.style.top = (cy - 10) + 'px';
+    p.style.setProperty('--drift', (Math.random()*60 - 30) + 'px');
+    p.style.setProperty('--drift2', (Math.random()*40 - 20) + 'px');
+    p.style.setProperty('--ey', (cy + 180 + Math.random()*100) + 'px');
+    p.style.setProperty('--dur', (1.8 + Math.random()*1.4) + 's');
+    p.style.animationDelay = (Math.random()*0.2) + 's';
+    box.appendChild(p);
+    setTimeout(()=>p.remove(), 4000);
   }
 }
 
-function openSetup() {
-  setupSlot = state.me || 'A';
-  $('#setup-name').value = state.me ? state.users[state.me].name : DEFAULT_NAMES[setupSlot];
-  $$('.slot-btn').forEach(b => b.classList.toggle('active', b.dataset.slot === setupSlot));
-  syncAppearanceControls();
-  refreshBgPreview();
-  refreshRoomInfo();
-  $('#setup-mask').classList.remove('hidden');
+function renderTarotResult(){
+  const box=$('#tarot-result');
+  box.innerHTML=tarotPicked.map((p,n)=>{
+    const [name,up,down]=TAROT_DATA[p.idx];
+    const meaning=p.rev?down:up;
+    return `<div class="tr-item">
+      <h5>${n+1}. ${esc(name)}<span class="pos-tag">${p.rev?'逆位':'正位'}</span></h5>
+      <p>${esc(meaning)}</p>
+    </div>`;
+  }).join('');
 }
-function closeSetup() { $('#setup-mask').classList.add('hidden'); }
 
-$$('.slot-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    setupSlot = btn.dataset.slot;
-    $$('.slot-btn').forEach(b => b.classList.toggle('active', b === setupSlot));
-  });
-});
+/* ============================================================
+   抽签
+============================================================ */
+let signBusy=false;
 
-$('#open-settings').addEventListener('click', openSetup);
-$('#setup-cancel').addEventListener('click', closeSetup);
-$('#setup-mask').addEventListener('click', e => {
-  if (e.target.id === 'setup-mask') closeSetup();
-});
+function drawSign(){
+  if(signBusy)return;
+  signBusy=true;
+  const bg=$('#sign-bg');
+  const result=$('#sign-result');
+  result.classList.remove('show');
 
-/* 外观滑块 */
-$('#setup-alpha').addEventListener('input', e => {
-  const v = +e.target.value / 100;
-  $('#val-alpha').textContent = e.target.value + '%';
-  cfg.appearance.glassAlpha = v;
-  applyAppearance();
-  saveCfg();
-});
-$('#setup-blur').addEventListener('input', e => {
-  const v = +e.target.value;
-  $('#val-blur').textContent = v + 'px';
-  cfg.appearance.glassBlur = v;
-  applyAppearance();
-  saveCfg();
-});
-$('#setup-tint').addEventListener('input', e => {
-  const v = +e.target.value / 100;
-  $('#val-tint').textContent = e.target.value + '%';
-  cfg.appearance.bgTint = v;
-  applyAppearance();
-  saveCfg();
-});
-
-/* 壁纸 */
-$('#setup-bg').addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  toast('正在处理壁纸…');
-  try {
-    const src = await readImage(f, 1600, 0.75, 600000);
-    cfg.appearance.bg = src;
-    applyAppearance();
-    saveCfg();
-    refreshBgPreview();
-    toast('壁纸已更新');
-  } catch (err) {
-    console.error(err);
-    toast('壁纸处理失败');
+  for(let i=0; i<20; i++){
+    setTimeout(()=>{
+      const d=document.createElement('div');
+      d.className='rain-drop-anim';
+      d.style.left = (10 + Math.random()*80) + '%';
+      d.style.setProperty('--sy', (30 + Math.random()*60) + 'px');
+      d.style.setProperty('--ey', (250 + Math.random()*80) + 'px');
+      d.style.animationDuration = (1.6 + Math.random()*1.2) + 's';
+      d.style.transform = `scale(${0.6 + Math.random()*0.8})`;
+      bg.appendChild(d);
+      setTimeout(()=>d.remove(), 3500);
+    }, i*60);
   }
-  e.target.value = '';
-});
-$('#setup-bg-clear').addEventListener('click', () => {
-  cfg.appearance.bg = '';
-  applyAppearance();
-  saveCfg();
-  refreshBgPreview();
-  toast('壁纸已清除');
-});
-$('#setup-bg-reset').addEventListener('click', () => {
-  cfg.appearance = Object.assign({}, DEFAULT_APPEARANCE);
-  applyAppearance();
-  saveCfg();
-  syncAppearanceControls();
-  refreshBgPreview();
-  toast('已恢复默认外观');
-});
 
-/* 房间管理 */
-function generateRoomId() {
-  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  setTimeout(()=>{
+    const idx=Math.floor(Math.random()*SIGN_DATA.length);
+    const [level,text]=SIGN_DATA[idx];
+    $('#sr-num').textContent=`第 ${idx+1} 签`;
+    $('#sr-level').textContent=level;
+    $('#sr-text').textContent=text;
+    result.classList.add('show');
+    setTimeout(()=>{signBusy=false;},500);
+  }, 2800);
+}
+
+/* ============================================================
+   页面切换
+============================================================ */
+function switchPage(name){
+  $$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+name));
+  $$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+}
+
+function refreshBgPreview(){
+  const box=$('#bg-preview');
+  if(cfg.appearance.bg){box.innerHTML=`<img src="${cfg.appearance.bg}" alt="">`;}
+  else{box.textContent='— 暂无壁纸 —';}
+}
+
+function syncAppearanceControls(){
+  const a=cfg.appearance;
+  $('#sl-alpha').value=Math.round((a.glassAlpha??0.55)*100);
+  $('#val-alpha').textContent=Math.round((a.glassAlpha??0.55)*100)+'%';
+  $('#sl-blur').value=Math.round(a.glassBlur??20);
+  $('#val-blur').textContent=Math.round(a.glassBlur??20)+'px';
+  $('#sl-tint').value=Math.round((a.bgTint??0.10)*100);
+  $('#val-tint').textContent=Math.round((a.bgTint??0.10)*100)+'%';
+}
+
+function refreshRoomInfo(){
+  const box=$('#room-info');
+  if(cfg.roomId){
+    const link=`${location.origin}${location.pathname}#room=${cfg.roomId}`;
+    box.innerHTML=`
+      <div class="room-box"><span class="label">房间码</span><span class="code">${cfg.roomId}</span></div>
+      <div class="room-box"><span class="label">邀请链接</span><span class="code">${link}</span></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" id="btn-room-copy">复制链接</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;color:#B08A8A" id="btn-room-leave">退出房间</button>
+      </div>`;
+    $('#btn-room-copy').onclick=async()=>{
+      try{await navigator.clipboard.writeText(link);toast('已复制');}
+      catch(e){toast('复制失败');}
+    };
+    $('#btn-room-leave').onclick=()=>{
+      if(!confirm('退出后不再同步，本地数据保留。确定吗？'))return;
+      if(mqttClient){try{mqttClient.end(true);}catch(e){}mqttClient=null;}
+      mqttConnected=false;cfg.roomId='';saveCfg();
+      setSyncStatus('local');refreshRoomInfo();toast('已退出');
+    };
+  }else{
+    box.innerHTML=`
+      <button class="btn btn-primary btn-block" id="btn-room-create">创建新房间</button>
+      <button class="btn btn-ghost btn-block" id="btn-room-join" style="margin-top:6px">加入已有房间</button>`;
+    $('#btn-room-create').onclick=()=>{
+      const id=genRoomId();cfg.roomId=id;saveCfg();connectMQTT();refreshRoomInfo();toast('房间已创建');
+    };
+    $('#btn-room-join').onclick=()=>{
+      const code=prompt('请输入房间码或邀请链接：');
+      if(!code)return;
+      const m=code.match(/#room=([a-zA-Z0-9-]+)/);
+      const id=m?m[1]:code.trim();
+      if(!id){toast('无效');return;}
+      cfg.roomId=id;saveCfg();connectMQTT();refreshRoomInfo();toast('已加入');
+    };
+  }
+}
+function genRoomId(){
+  const chars='abcdefghijkmnpqrstuvwxyz23456789';
+  let s='';for(let i=0;i<8;i++)s+=chars[Math.floor(Math.random()*chars.length)];
   return s;
 }
 
-$('#setup-create-room').addEventListener('click', () => {
-  const id = generateRoomId();
-  cfg.roomId = id;
-  saveCfg();
-  connectMQTT();
-  refreshRoomInfo();
-  toast('房间已创建：' + id);
+function renderThemes(){
+  const box=$('#theme-list');
+  const list=Object.entries(cfg.themes);
+  if(!list.length){box.innerHTML=`<div style="font-size:11.5px;color:#BBAFB5;font-style:italic;text-align:center;padding:10px">还没有主题，点下面新建</div>`;return;}
+  box.innerHTML=list.map(([id,t])=>`
+    <div class="theme-item">
+      <div class="t-name">${esc(t.name)}${cfg.activeTheme===id?' <span style="color:#A8C4A0;font-size:10px">· 使用中</span>':''}</div>
+      <span class="t-act" data-act="edit" data-id="${id}">编辑</span>
+      <span class="t-act" data-act="apply" data-id="${id}">应用</span>
+      <span class="t-act" data-act="del" data-id="${id}" style="color:#B08A8A">删除</span>
+    </div>`).join('');
+}
+
+/* ============================================================
+   事件绑定
+============================================================ */
+$$('.nav-btn').forEach(b=>{
+  b.addEventListener('click',()=>switchPage(b.dataset.page));
 });
 
-$('#setup-copy-link').addEventListener('click', async () => {
-  if (!cfg.roomId) return;
-  const link = `${location.origin}${location.pathname}#room=${cfg.roomId}`;
-  try {
-    await navigator.clipboard.writeText(link);
-    toast('链接已复制');
-  } catch (e) {
-    toast('复制失败，请长按选择');
+function openMsgPanel(){$('#msg-panel').classList.add('open');$('#msg-backdrop').classList.add('show');}
+function closeMsgPanel(){$('#msg-panel').classList.remove('open');$('#msg-backdrop').classList.remove('show');}
+$('#btn-bell').onclick=()=>{openMsgPanel();};
+$('#btn-msg-close').onclick=closeMsgPanel;
+$('#msg-backdrop').onclick=closeMsgPanel;
+
+document.addEventListener('click',e=>{
+  const it=e.target.closest('.msg-item');
+  if(it&&!e.target.classList.contains('m-close')){
+    const id=it.dataset.id;
+    const m=state.messages.find(x=>x.id===id);
+    if(!m)return;
+    m.read=true;syncOp(()=>{});
+    renderMessages();
+    if(m.type==='survey'&&m.refId){
+      closeMsgPanel();
+      switchPage('survey');
+      setTimeout(()=>openQuiz(m.refId),200);
+    }
+    return;
+  }
+  const close=e.target.closest('.m-close');
+  if(close){
+    e.stopPropagation();
+    const id=close.dataset.id;
+    if(!confirm('删除这条消息？'))return;
+    syncOp(()=>{state.messages=state.messages.filter(x=>x.id!==id);});
+    renderMessages();
   }
 });
 
-$('#setup-leave').addEventListener('click', () => {
-  if (!confirm('退出后这台设备不再同步，本地数据会保留。确定吗？')) return;
-  if (mqttClient) {
-    try { mqttClient.end(true); } catch(e) {}
-    mqttClient = null;
-  }
-  mqttConnected = false;
-  cfg.roomId = '';
-  saveCfg();
-  setSyncStatus('local');
-  refreshRoomInfo();
-  toast('已退出房间');
-});
+$('#btn-settings').onclick=()=>{
+  switchPage('settings');
+  refreshBgPreview();syncAppearanceControls();refreshRoomInfo();renderThemes();renderPeople();
+};
 
-/* 保存 */
-$('#setup-save').addEventListener('click', async () => {
-  const name = $('#setup-name').value.trim();
-  if (!name) { toast('请填写昵称'); return; }
-  if (!setupSlot) { toast('请选择你是第几位'); return; }
-
-  const btn = $('#setup-save');
-  btn.disabled = true; btn.textContent = '保存中…';
-
-  cfg.slot = setupSlot;
-  state.me = setupSlot;
-  saveCfg();
-
-  await syncOp(() => {
-    state.users[setupSlot].name = name;
-    state.users[setupSlot].updatedAt = Date.now();
+function openEditModal(slot){
+  window.__editingSlot=slot;
+  window.__editingAvatar=state.users[slot].avatar||'';
+  $('#edit-name').value=state.users[slot].name;
+  $('#edit-status').value=state.users[slot].status;
+  refreshEditAvatar();
+  $('#edit-mask').classList.remove('hidden');
+}
+function refreshEditAvatar(){
+  const el=$('#edit-avatar');
+  el.className='mjy-avatar '+(window.__editingSlot||'A');
+  el.innerHTML=window.__editingAvatar?`<img src="${window.__editingAvatar}">`:`<span>${esc(($('#edit-name').value||'·').slice(0,1))}</span>`;
+}
+$('#edit-avatar').onclick=()=>$('#edit-file').click();
+$('#edit-name').oninput=refreshEditAvatar;
+$('#edit-file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{window.__editingAvatar=await readImage(f,200,0.7,40000);refreshEditAvatar();}catch(err){toast('头像处理失败');}
+};
+$('#edit-cancel').onclick=()=>$('#edit-mask').classList.add('hidden');
+$('#edit-mask').onclick=e=>{if(e.target.id==='edit-mask')$('#edit-mask').classList.add('hidden');};
+$('#edit-save').onclick=async()=>{
+  const slot=window.__editingSlot;if(!slot)return;
+  const name=$('#edit-name').value.trim()||state.users[slot].name;
+  const status=$('#edit-status').value.trim();
+  await syncOp(()=>{
+    Object.assign(state.users[slot],{name,status,avatar:window.__editingAvatar,updatedAt:Date.now()});
   });
-
-  btn.disabled = false; btn.textContent = '保存';
-  closeSetup();
+  $('#edit-mask').classList.add('hidden');
   renderAll();
+  toast('已保存');
+};
 
-  if (isCloudReady() && !mqttClient) {
-    connectMQTT();
-  }
-  toast(isCloudReady() ? '已保存并同步' : '已保存到本地');
+$('#btn-edit-me').onclick=()=>{
+  if(!state.me){toast('请先在欢迎页选择身份');return;}
+  openEditModal(state.me);
+};
+document.addEventListener('click',e=>{
+  const pm=e.target.closest('.person-mini');
+  if(pm)openEditModal(pm.dataset.user);
 });
 
-/* ============================================================
-   手动同步：点击徽章，重新广播 / 请求
-   ============================================================ */
-$('#sync-badge').addEventListener('click', () => {
-  if (!isCloudReady()) {
-    toast('还没有房间，点击 ⚙ 创建或加入');
-    return;
+let pendingImage='';
+$('#journal-file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{pendingImage=await readImage(f);}catch(err){toast('图片读取失败');return;}
+  const strip=$('#journal-preview');
+  strip.innerHTML=`<img src="${pendingImage}" alt=""><button class="btn btn-ghost btn-sm" id="rm-img">移除</button>`;
+  strip.classList.remove('hidden');
+  $('#rm-img').onclick=()=>{pendingImage='';strip.classList.add('hidden');strip.innerHTML='';$('#journal-file').value='';};
+};
+$('#btn-publish').onclick=async()=>{
+  if(!state.me){toast('请先选择身份');return;}
+  const ta=$('#journal-input');const text=ta.value.trim();
+  if(!text&&!pendingImage)return;
+  const btn=$('#btn-publish');btn.disabled=true;btn.textContent='发布中';
+  await syncOp(()=>{
+    state.journals.push({id:uid(),author:state.me,text,image:pendingImage,time:Date.now(),updatedAt:Date.now(),deleted:false});
+  });
+  btn.disabled=false;btn.textContent='发布';
+  ta.value='';pendingImage='';
+  $('#journal-preview').classList.add('hidden');$('#journal-preview').innerHTML='';$('#journal-file').value='';
+  renderJournals();
+  toast('已发布');
+};
+
+$('#photo-file').onchange=async e=>{
+  if(!state.me){toast('请先选择身份');return;}
+  const files=[...e.target.files];if(!files.length)return;
+  toast(`处理 ${files.length} 张…`);
+  const items=[];
+  for(const f of files){
+    try{const src=await readImage(f);items.push({id:uid(),author:state.me,src,caption:'',time:Date.now(),updatedAt:Date.now(),deleted:false});}catch(err){}
   }
-  if (!mqttConnected) {
-    toast('正在重新连接…');
-    connectMQTT();
-    return;
-  }
-  // 请求对方数据 + 广播自己的数据
-  mqttClient.publish(roomTopic() + '/request', JSON.stringify({
-    from: state.me || 'unknown',
-    t: Date.now()
-  }), { qos: 0 });
-  publishFullState();
-  toast('已发送同步请求');
+  if(!items.length){e.target.value='';return;}
+  await syncOp(()=>{items.forEach(it=>state.photos.push(it));});
+  e.target.value='';renderAlbum();toast('上传完成');
+};
+
+document.addEventListener('click',async e=>{
+  const btn=e.target.closest('.send');
+  if(!btn)return;
+  if(!state.me){toast('请先选择身份');return;}
+  const{kind,id}=btn.dataset;
+  const input=document.querySelector(`input[data-kind="${kind}"][data-id="${id}"]`);
+  if(!input)return;
+  const text=input.value.trim();if(!text)return;
+  input.value='';
+  await syncOp(()=>{
+    state.comments.push({id:uid(),parentType:kind,parentId:id,author:state.me,text,time:Date.now(),updatedAt:Date.now(),deleted:false});
+  });
+  renderJournals();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const input=e.target.closest('input[data-kind]');
+  if(!input)return;
+  e.preventDefault();
+  const{kind,id}=input.dataset;
+  const btn=document.querySelector(`.send[data-kind="${kind}"][data-id="${id}"]`);
+  btn&&btn.click();
 });
 
+document.addEventListener('click',async e=>{
+  const btn=e.target.closest('.del-btn');if(!btn)return;
+  const{kind,id}=btn.dataset;
+  if(!confirm('确定删除？'))return;
+  await syncOp(()=>{
+    const now=Date.now();
+    if(kind==='journal'){const j=state.journals.find(x=>x.id===id);if(j){j.deleted=true;j.updatedAt=now;}}
+    else if(kind==='photo'){const p=state.photos.find(x=>x.id===id);if(p){p.deleted=true;p.updatedAt=now;}}
+  });
+  renderAll();toast('已删除');
+});
+
+$('#survey-file').onchange=e=>{
+  const f=e.target.files[0];
+  handleSurveyFile(f);
+  e.target.value='';
+};
+
+document.addEventListener('click',e=>{
+  const it=e.target.closest('.survey-item');if(!it)return;
+  openQuiz(it.dataset.id);
+});
+
+$('#quiz-close').onclick=()=>{
+  saveQuizAnswer();syncOp(()=>{});
+  $('#quiz-overlay').classList.add('hidden');
+  renderSurveys();
+};
+$('#quiz-prev').onclick=()=>{
+  saveQuizAnswer();
+  quizState.idx=Math.max(0,quizState.idx-1);
+  renderQuizQuestion();
+};
+$('#quiz-next').onclick=async()=>{
+  const s=state.surveys.find(x=>x.id===quizState.surveyId);
+  if(!s)return;
+  saveQuizAnswer();
+  if(quizState.idx<s.questions.length-1){
+    quizState.idx++;
+    renderQuizQuestion();
+    syncOp(()=>{});
+  }else{
+    await finishQuiz();
+  }
+};
+
+$$('#tarot-counts button').forEach(b=>{
+  b.onclick=()=>{
+    $$('#tarot-counts button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');tarotCount=+b.dataset.c;
+  };
+});
+$('#btn-tarot-start').onclick=startTarot;
+$('#btn-tarot-reset').onclick=()=>{
+  $('#tarot-stage').classList.add('hidden');
+  $('#tarot-setup').classList.remove('hidden');
+  $('#tarot-result').innerHTML='';
+  $('#tarot-row-1').innerHTML='';
+  $('#tarot-row-2').innerHTML='';
+  tarotPicked=[];
+};
+document.addEventListener('click',e=>{
+  const c=e.target.closest('.tarot-card');
+  if(c)pickTarotCard(c);
+});
+
+$('#btn-sign').onclick=drawSign;
+
+$$('.mt-btn').forEach(b=>{
+  b.onclick=()=>{
+    $$('.mt-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    $$('.mystic-panel').forEach(p=>p.classList.remove('active'));
+    $('#panel-'+b.dataset.mt).classList.add('active');
+  };
+});
+
+$('#sl-alpha').oninput=e=>{
+  const v=+e.target.value/100;$('#val-alpha').textContent=e.target.value+'%';
+  cfg.appearance.glassAlpha=v;applyAppearance();saveCfg();
+};
+$('#sl-blur').oninput=e=>{
+  const v=+e.target.value;$('#val-blur').textContent=v+'px';
+  cfg.appearance.glassBlur=v;applyAppearance();saveCfg();
+};
+$('#sl-tint').oninput=e=>{
+  const v=+e.target.value/100;$('#val-tint').textContent=e.target.value+'%';
+  cfg.appearance.bgTint=v;applyAppearance();saveCfg();
+};
+
+$('#bg-file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  toast('处理壁纸…');
+  try{
+    const src=await readImage(f,1600,0.75,600000);
+    cfg.appearance.bg=src;applyAppearance();saveCfg();refreshBgPreview();toast('壁纸已更新');
+  }catch(err){toast('处理失败');}
+  e.target.value='';
+};
+$('#btn-bg-clear').onclick=()=>{cfg.appearance.bg='';applyAppearance();saveCfg();refreshBgPreview();toast('已清除');};
+$('#btn-bg-reset').onclick=()=>{
+  cfg.appearance=Object.assign({},DEFAULT_APPEARANCE);
+  applyAppearance();saveCfg();syncAppearanceControls();refreshBgPreview();toast('已恢复默认');
+};
+
 /* ============================================================
-   欢迎层
-   ============================================================ */
-function showWelcome() {
+   主题编辑器
+============================================================ */
+let editingThemeId = null;
+
+function openThemeEditor(id = null){
+  editingThemeId = id;
+  if(id && cfg.themes[id]){
+    $('#theme-editor-title').textContent = '编辑主题';
+    $('#theme-editor-name').value = cfg.themes[id].name;
+    $('#theme-editor-css').value = cfg.themes[id].css;
+  } else {
+    $('#theme-editor-title').textContent = '新建主题';
+    $('#theme-editor-name').value = '';
+    $('#theme-editor-css').value = '';
+  }
+  $('#theme-editor-mask').classList.remove('hidden');
+}
+
+function closeThemeEditor(){
+  $('#theme-editor-mask').classList.add('hidden');
+  editingThemeId = null;
+}
+
+$('#btn-theme-new').onclick = () => openThemeEditor(null);
+$('#theme-editor-cancel').onclick = closeThemeEditor;
+$('#theme-editor-mask').onclick = e => {
+  if(e.target.id === 'theme-editor-mask') closeThemeEditor();
+};
+
+$('#theme-editor-save').onclick = () => {
+  const name = $('#theme-editor-name').value.trim() || '未命名主题';
+  const css = $('#theme-editor-css').value.trim();
+  if(!css){ toast('CSS 代码不能为空'); return; }
+  let id = editingThemeId;
+  if(!id){
+    id = uid();
+    cfg.themes[id] = { name, css, wp: null };
+  } else {
+    cfg.themes[id].name = name;
+    cfg.themes[id].css = css;
+  }
+  saveCfg();
+  renderThemes();
+  closeThemeEditor();
+  applyThemeById(id, true);
+};
+
+let previewThemeId=null;
+function applyThemeById(id,preview=false){
+  const t=cfg.themes[id];if(!t)return;
+  const old=document.getElementById('mjy-theme-style');if(old)old.remove();
+  const style=document.createElement('style');style.id='mjy-theme-style';
+  style.textContent=translateCSS(t.css);document.head.appendChild(style);
+  if(preview){
+    previewThemeId=id;
+    $('#theme-preview-bar').classList.remove('hidden');
+    $('#theme-preview-info').textContent='预览中：'+t.name;
+  }else{
+    cfg.activeTheme=id;saveCfg();
+  }
+}
+
+$('#btn-theme-cancel').onclick=()=>{
+  $('#theme-preview-bar').classList.add('hidden');
+  previewThemeId=null;
+  applyTheme();
+};
+$('#btn-theme-apply').onclick=()=>{
+  if(!previewThemeId)return;
+  cfg.activeTheme=previewThemeId;saveCfg();
+  $('#theme-preview-bar').classList.add('hidden');
+  previewThemeId=null;
+  renderThemes();
+  toast('主题已应用');
+};
+$('#wp-cancel').onclick=()=>$('#wallpaper-opt-mask').classList.add('hidden');
+$('#wallpaper-opt-mask').onclick=e=>{
+  if(e.target.id==='wallpaper-opt-mask')$('#wallpaper-opt-mask').classList.add('hidden');
+  const b=e.target.closest('[data-wp]');if(!b)return;
+  const mode=b.dataset.wp;
+  if(mode==='theme'&&cfg.themes[cfg.activeTheme].wp){
+    cfg.appearance.bg=cfg.themes[cfg.activeTheme].wp;
+  }
+  applyAppearance();saveCfg();refreshBgPreview();
+  $('#wallpaper-opt-mask').classList.add('hidden');
+};
+
+document.addEventListener('click',e=>{
+  const t=e.target.closest('.t-act');if(!t)return;
+  const act=t.dataset.act;const id=t.dataset.id;
+  if(act==='apply'){applyThemeById(id,true);}
+  else if(act==='edit'){openThemeEditor(id);}
+  else if(act==='del'){
+    if(!confirm('删除这个主题？'))return;
+    delete cfg.themes[id];
+    if(cfg.activeTheme===id)cfg.activeTheme=null;
+    saveCfg();applyTheme();renderThemes();
+  }
+});
+
+$('#btn-export').onclick=()=>{
+  const data=JSON.stringify(exportState());
+  const b64=btoa(unescape(encodeURIComponent(data)));
+  $('#export-text').value=b64;
+  $('#export-mask').classList.remove('hidden');
+};
+$('#export-close').onclick=()=>$('#export-mask').classList.add('hidden');
+$('#export-mask').onclick=e=>{if(e.target.id==='export-mask')$('#export-mask').classList.add('hidden');};
+$('#export-copy').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('#export-text').value);toast('已复制');}
+  catch(e){toast('复制失败');$('#export-text').select();}
+};
+$('#btn-import').onclick=()=>{$('#import-text').value='';$('#import-mask').classList.remove('hidden');};
+$('#import-close').onclick=()=>$('#import-mask').classList.add('hidden');
+$('#import-mask').onclick=e=>{if(e.target.id==='import-mask')$('#import-mask').classList.add('hidden');};
+$('#import-confirm').onclick=async()=>{
+  const raw=$('#import-text').value.trim();if(!raw)return;
+  let json;
+  try{json=decodeURIComponent(escape(atob(raw)));}catch(e){json=raw;}
+  let d;try{d=JSON.parse(json);}catch(e){toast('格式不对');return;}
+  mergeRemote(d);saveLocal();renderAll();
+  $('#import-mask').classList.add('hidden');
+  toast('导入成功');
+};
+
+function showWelcome(){
   $('#welcome-main').classList.remove('hidden');
-  $('#welcome-result').classList.add('hidden');
-  $('#welcome-join').classList.add('hidden');
+  $('#w-result').classList.add('hidden');
+  $('#w-join-form').classList.add('hidden');
   $('#welcome-mask').classList.remove('hidden');
 }
-function hideWelcome() {
-  $('#welcome-mask').classList.add('hidden');
-}
-
-$('#btn-create').addEventListener('click', () => {
-  const id = generateRoomId();
-  cfg.roomId = id;
-  saveCfg();
-  const link = `${location.origin}${location.pathname}#room=${id}`;
-  $('#invite-link').textContent = link;
+function hideWelcome(){$('#welcome-mask').classList.add('hidden');}
+$('#w-create').onclick=()=>{
+  const id=genRoomId();cfg.roomId=id;saveCfg();
+  const link=`${location.origin}${location.pathname}#room=${id}`;
+  $('#w-link').textContent=link;
   $('#welcome-main').classList.add('hidden');
-  $('#welcome-result').classList.remove('hidden');
+  $('#w-result').classList.remove('hidden');
   connectMQTT();
-});
-
-$('#btn-copy-link').addEventListener('click', async () => {
-  const link = $('#invite-link').textContent;
-  try {
-    await navigator.clipboard.writeText(link);
-    toast('链接已复制，发给 TA 吧');
-  } catch (e) {
-    toast('复制失败，请长按选择');
-  }
-});
-
-$('#btn-enter').addEventListener('click', () => {
-  hideWelcome();
-  if (!state.me) openSetup();
-  renderAll();
-});
-
-$('#btn-join').addEventListener('click', () => {
+};
+$('#w-copy').onclick=async()=>{
+  try{await navigator.clipboard.writeText($('#w-link').textContent);toast('已复制');}
+  catch(e){toast('复制失败');}
+};
+$('#w-enter').onclick=()=>{hideWelcome();if(!state.me)toast('请先在设置里选择身份');renderAll();};
+$('#w-join').onclick=()=>{
   $('#welcome-main').classList.add('hidden');
-  $('#welcome-join').classList.remove('hidden');
-  $('#join-input').value = '';
-  setTimeout(() => $('#join-input').focus(), 100);
-});
-
-$('#btn-join-back').addEventListener('click', () => {
-  $('#welcome-main').classList.remove('hidden');
-  $('#welcome-join').classList.add('hidden');
-});
-
-$('#btn-join-confirm').addEventListener('click', () => {
-  let raw = $('#join-input').value.trim();
-  if (!raw) { toast('请输入房间码'); return; }
-
-  let id = raw;
-  const m = raw.match(/#room=([a-zA-Z0-9-]+)/);
-  if (m) id = m[1];
-  else if (raw.includes('/')) {
-    const parts = raw.split('/');
-    id = parts[parts.length - 1];
-  }
-
-  cfg.roomId = id;
-  saveCfg();
-  hideWelcome();
-  connectMQTT();
-  toast('已加入房间：' + id);
-  if (!state.me) openSetup();
+  $('#w-join-form').classList.remove('hidden');
+  $('#w-join-input').value='';
+  setTimeout(()=>$('#w-join-input').focus(),100);
+};
+$('#w-join-back').onclick=()=>{$('#welcome-main').classList.remove('hidden');$('#w-join-form').classList.add('hidden');};
+$('#w-join-confirm').onclick=()=>{
+  let raw=$('#w-join-input').value.trim();if(!raw){toast('请输入');return;}
+  let id=raw;
+  const m=raw.match(/#room=([a-zA-Z0-9-]+)/);
+  if(m)id=m[1];
+  else if(raw.includes('/')){const parts=raw.split('/');id=parts[parts.length-1];}
+  cfg.roomId=id;saveCfg();hideWelcome();connectMQTT();toast('已加入');
+  if(!state.me)toast('请先在设置里选择身份');
   renderAll();
-});
+};
+$('#w-skip').onclick=()=>{hideWelcome();renderAll();};
 
-$('#btn-skip').addEventListener('click', () => {
-  hideWelcome();
-  if (!state.me) openSetup();
-  renderAll();
-});
-
-/* ============================================================
-   雨滴动画
-   ============================================================ */
-(function rain() {
-  const canvas = $('#rain');
-  const ctx = canvas.getContext('2d');
-  let W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
-  let drops = [], ripples = [];
-
-  function resize() {
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const count = Math.min(220, Math.round(W * H / 9000));
-    drops = Array.from({ length: count }, () => newDrop(true));
+(function rain(){
+  const canvas=$('#rain');const ctx=canvas.getContext('2d');
+  let W=0,H=0,dpr=Math.min(window.devicePixelRatio||1,2);
+  let drops=[],ripples=[];
+  function resize(){
+    W=window.innerWidth;H=window.innerHeight;
+    canvas.width=W*dpr;canvas.height=H*dpr;
+    canvas.style.width=W+'px';canvas.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const count=Math.min(180,Math.round(W*H/12000));
+    drops=Array.from({length:count},()=>newDrop(true));
   }
-  function newDrop(init) {
-    return {
-      x: Math.random() * (W + 200) - 100,
-      y: init ? Math.random() * H : -30 - Math.random() * 80,
-      len: 9 + Math.random() * 22,
-      spd: 1.1 + Math.random() * 2.6,
-      alpha: 0.05 + Math.random() * 0.16,
-      w: 0.6 + Math.random() * 0.9,
-      drift: 0.14 + Math.random() * 0.24
-    };
+  function newDrop(init){
+    return{x:Math.random()*(W+200)-100,y:init?Math.random()*H:-30-Math.random()*80,
+      len:9+Math.random()*20,spd:1+Math.random()*2.4,
+      alpha:0.05+Math.random()*0.14,w:0.6+Math.random()*0.8,drift:0.14+Math.random()*0.24};
   }
-  function spawnRipple() {
-    if (ripples.length > 14) return;
-    ripples.push({
-      x: Math.random() * W, y: H - Math.random() * 120,
-      r: 1, max: 22 + Math.random() * 34,
-      a: 0.14 + Math.random() * 0.08
-    });
+  function spawnRipple(){
+    if(ripples.length>12)return;
+    ripples.push({x:Math.random()*W,y:H-Math.random()*100,r:1,max:20+Math.random()*30,a:0.12+Math.random()*0.08});
   }
-  let last = 0;
-  function frame(t) {
-    ctx.clearRect(0, 0, W, H);
-    ctx.lineCap = 'round';
-    for (const d of drops) {
+  let last=0;
+  function frame(t){
+    ctx.clearRect(0,0,W,H);
+    ctx.lineCap='round';
+    for(const d of drops){
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(140,128,150,${d.alpha})`;
-      ctx.lineWidth = d.w;
-      ctx.moveTo(d.x, d.y);
-      ctx.lineTo(d.x - d.len * d.drift, d.y + d.len);
+      ctx.strokeStyle=`rgba(140,128,150,${d.alpha})`;
+      ctx.lineWidth=d.w;
+      ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-d.len*d.drift,d.y+d.len);
       ctx.stroke();
-      d.y += d.spd; d.x -= d.drift * d.spd;
-      if (d.y > H + 30) {
-        Object.assign(d, newDrop(false));
-        if (Math.random() < 0.12) spawnRipple();
-      }
+      d.y+=d.spd;d.x-=d.drift*d.spd;
+      if(d.y>H+30){Object.assign(d,newDrop(false));if(Math.random()<0.1)spawnRipple();}
     }
-    for (let i = ripples.length - 1; i >= 0; i--) {
-      const r = ripples[i];
+    for(let i=ripples.length-1;i>=0;i--){
+      const r=ripples[i];
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(150,138,160,${r.a * (1 - r.r / r.max)})`;
-      ctx.lineWidth = 1;
-      ctx.ellipse(r.x, r.y, r.r, r.r * 0.32, 0, 0, Math.PI * 2);
+      ctx.strokeStyle=`rgba(150,138,160,${r.a*(1-r.r/r.max)})`;
+      ctx.lineWidth=1;
+      ctx.ellipse(r.x,r.y,r.r,r.r*0.32,0,0,Math.PI*2);
       ctx.stroke();
-      r.r += 0.85;
-      if (r.r > r.max) ripples.splice(i, 1);
+      r.r+=0.8;
+      if(r.r>r.max)ripples.splice(i,1);
     }
-    if (t - last > 340) { spawnRipple(); last = t; }
+    if(t-last>400){spawnRipple();last=t;}
     requestAnimationFrame(frame);
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize',resize);
   resize();
   requestAnimationFrame(frame);
 })();
 
-/* ============================================================
-   启动
-   ============================================================ */
-(function boot() {
+(function boot(){
   applyAppearance();
   loadLocal();
 
-  const m = location.hash.match(/#room=([a-zA-Za-z0-9-]+)/);
-  if (m && !cfg.roomId) {
-    cfg.roomId = m[1];
-    saveCfg();
-  }
+  const m=location.hash.match(/#room=([a-zA-Z0-9-]+)/);
+  if(m&&!cfg.roomId){cfg.roomId=m[1];saveCfg();}
 
-  if (!isCloudReady()) {
-    setSyncStatus('local');
-    renderAll();
-    showWelcome();
-    return;
-  }
+  if(cfg.activeTheme&&cfg.themes[cfg.activeTheme])applyTheme();
 
   renderAll();
-  connectMQTT();
 
-  if (!state.me) {
-    openSetup();
+  if(!isCloudReady()){
+    setSyncStatus('local');
+    showWelcome();
+  }else{
+    connectMQTT();
+    setTimeout(checkInvites,1200);
   }
+
+  window.addEventListener('orientationchange',()=>setTimeout(()=>{document.body.style.height=window.innerHeight+'px';},200));
+  document.body.style.height=window.innerHeight+'px';
+  window.addEventListener('resize',()=>{document.body.style.height=window.innerHeight+'px';});
 })();
 </script>
 </body>
